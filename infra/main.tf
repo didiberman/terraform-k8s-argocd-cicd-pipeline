@@ -139,10 +139,11 @@ resource "hcloud_server" "master" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role      = "server"
-    token     = "secretk3stoken" # In prod, use random string
-    master_ip = ""               # Not used for server role, but required by template
-    location  = "nbg1"
+    role             = "server"
+    token            = "secretk3stoken" # In prod, use random string
+    master_ip        = ""               # Not used for server role
+    master_public_ip = ""               # Not used for server role
+    location         = "nbg1"
   })
 
   depends_on = [
@@ -164,10 +165,11 @@ resource "hcloud_server" "worker" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role      = "agent"
-    token     = "secretk3stoken"
-    master_ip = "10.0.1.5" # Master's internal IP from network block
-    location  = "fsn1"
+    role             = "agent"
+    token            = "secretk3stoken"
+    master_ip        = "10.0.1.5"
+    master_public_ip = hcloud_server.master.ipv4_address
+    location         = "fsn1"
   })
 
   depends_on = [
@@ -190,10 +192,11 @@ resource "hcloud_server" "worker2" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role      = "agent"
-    token     = "secretk3stoken"
-    master_ip = "10.0.1.5" # Master's internal IP from network block
-    location  = "hel1"
+    role             = "agent"
+    token            = "secretk3stoken"
+    master_ip        = "10.0.1.5"
+    master_public_ip = hcloud_server.master.ipv4_address
+    location         = "hel1"
   })
 
   depends_on = [
@@ -220,10 +223,11 @@ resource "hcloud_server" "worker3" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role      = "agent"
-    token     = "secretk3stoken"
-    master_ip = "10.0.1.5"
-    location  = "sin"
+    role             = "agent"
+    token            = "secretk3stoken"
+    master_ip        = "10.0.1.5"
+    master_public_ip = hcloud_server.master.ipv4_address
+    location         = "sin"
   })
 
   depends_on = [
@@ -246,10 +250,11 @@ resource "hcloud_server" "worker4" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role      = "agent"
-    token     = "secretk3stoken"
-    master_ip = "10.0.1.5"
-    location  = "hil"
+    role             = "agent"
+    token            = "secretk3stoken"
+    master_ip        = "10.0.1.5"
+    master_public_ip = hcloud_server.master.ipv4_address
+    location         = "hil"
   })
 
   depends_on = [
