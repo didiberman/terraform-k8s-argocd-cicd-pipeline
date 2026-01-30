@@ -1,5 +1,6 @@
 const http = require('http');
 const client = require('prom-client');
+const fs = require('fs');
 
 // Create a Registry which registers the metrics
 const register = new client.Registry();
@@ -24,6 +25,33 @@ const server = http.createServer(async (req, res) => {
     }
 
     const nodeName = process.env.NODE_NAME || 'Unknown';
+    let location = 'Unknown Location';
+
+    if (process.env.NODE_LOCATION_FILE) {
+        try {
+            const data = fs.readFileSync(process.env.NODE_LOCATION_FILE, 'utf8');
+            location = data.trim();
+        } catch (err) {
+            console.error('Error reading location file:', err);
+        }
+    } else {
+        // Fallback for local testing or if env var missing
+        location = process.env.NODE_LOCATION || 'Unknown Location';
+    }
+
+    const getLocationName = (code) => {
+        const map = {
+            'nbg1': '🇩🇪 Nuremberg, DE',
+            'fsn1': '🇩🇪 Falkenstein, DE',
+            'hel1': '🇫🇮 Helsinki, FI',
+            'ash': '🇺🇸 Ashburn, VA',
+            'hil': '🇺🇸 Hillsboro, OR',
+            'sin': '🇸🇬 Singapore, SG'
+        };
+        return map[code] || code;
+    };
+
+    const locationDisplay = getLocationName(location);
 
     const bgColor = process.env.BG_COLOR;
     const backgroundStyle = bgColor
@@ -155,12 +183,23 @@ const server = http.createServer(async (req, res) => {
         @keyframes fall {
             to { transform: translateY(110vh) rotate(360deg); }
         }
+        .location-badge {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            display: inline-block;
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Request Served By</h1>
         <div class="node-name">${nodeName}</div>
+        <div class="location-badge">${locationDisplay}</div>
 
         <div class="info-box">
             <div class="info-title">⚡️ Behind the Scenes</div>

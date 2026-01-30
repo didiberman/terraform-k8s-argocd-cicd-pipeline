@@ -24,6 +24,8 @@ spec:
                   fieldPath: spec.nodeName
             - name: BG_COLOR
               value: "" # BG_COLOR - Managed by Update App Color Action
+            - name: NODE_LOCATION_FILE
+              value: "/app/config/location"
           ports:
             - containerPort: 8080
           livenessProbe:
@@ -42,6 +44,15 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "250m"
+          volumeMounts:
+            - name: node-location
+              mountPath: /app/config/location
+              readOnly: true
+      volumes:
+        - name: node-location
+          hostPath:
+            path: /etc/node-location
+            type: File
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
