@@ -147,10 +147,10 @@ const server = http.createServer(async (req, res) => {
         <div class="info-box">
             <div class="info-title">⚡️ Behind the Scenes</div>
             <div class="info-content">
-                Traffic flows from <span class="pill">Cloudflare</span> to the <span class="pill">Traefik Ingress</span>, which load-balances requests across 3 worker nodes.
+                Traffic flows directly to the <span class="pill">Traefik Ingress</span>, which routes requests to a <strong>DaemonSet</strong> ensuring 1 pod runs on every worker node.
                 <br><br>
                 <strong>The Pipeline:</strong>
-                Code Push ➔ GitHub Actions (CI) ➔ GHCR ➔ ArgoCD (CD) ➔ K3s Cluster
+                New Release Created ➔ GitHub Actions (CI) ➔ Build & Push Image ➔ ArgoCD Syncs Cluster
             </div>
         </div>
 

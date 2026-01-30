@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: sample-app
   namespace: default
   labels:
     app: sample-app
 spec:
-  replicas: 2
   selector:
     matchLabels:
       app: sample-app
@@ -41,3 +40,7 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "250m"
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1

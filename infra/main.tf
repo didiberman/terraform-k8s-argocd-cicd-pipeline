@@ -196,5 +196,5 @@ resource "cloudflare_record" "k8s_lbs" {
   name    = "k8s"
   value   = hcloud_server.master.ipv4_address
   type    = "A"
-  proxied = true
+  proxied = false
 }
