@@ -254,7 +254,7 @@ resource "hcloud_server" "worker4" {
     token            = "secretk3stoken"
     master_ip        = "10.0.1.5"
     master_public_ip = hcloud_server.master.ipv4_address
-    location         = "hil"
+    location         = "ash"
   })
 
   depends_on = [
