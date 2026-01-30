@@ -48,7 +48,11 @@ resource "aws_iam_user_policy" "github_actions" {
       {
         "Effect" : "Allow",
         "Action" : [
-          "iam:GetUser"
+          "iam:GetUser",
+          "iam:ListAccessKeys",
+          "iam:GetUserPolicy",
+          "iam:ListUserPolicies",
+          "iam:PutUserPolicy"
         ],
         "Resource" : "arn:aws:iam::*:user/github-actions-k8s-manager"
       }

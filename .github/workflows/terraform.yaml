@@ -40,18 +40,31 @@ jobs:
         run: |
           ACTION="${{ github.event.action }}"
           if [ "$ACTION" = "terraform_apply" ]; then
-            MSG="🚀 *Terraform Apply* started..."
+            MSG="🚀 *Terraform Plan & Apply* started..."
           else
             MSG="🗑 *Terraform Destroy* started..."
           fi
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ github.event.client_payload.chat_id }}" \
             -d text="$MSG" \
-            -d parse_mode=Markdown
+            -d parse_mode=Markdown)
+
+          # Capture message_id for subsequent edits
+          MSG_ID=$(echo "$RESPONSE" | jq -r '.result.message_id' || echo "")
+          echo "TG_MSG_ID=$MSG_ID" >> "$GITHUB_ENV"
 
       - name: Terraform Init
         working-directory: infra
         run: terraform init
+
+      - name: Notify Telegram - Initialized
+        if: github.event.client_payload.chat_id && env.TG_MSG_ID != ''
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
+            -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d message_id="${{ env.TG_MSG_ID }}" \
+            -d text="🏗️ *Terraform Initialized*... starting plan/apply." \
+            -d parse_mode=Markdown
 
       - name: Terraform Apply
         if: github.event.action == 'terraform_apply'
@@ -62,6 +75,21 @@ jobs:
         if: github.event.action == 'terraform_destroy'
         working-directory: infra
         run: terraform destroy -auto-approve
+
+      - name: Notify Telegram - Infrastructure Done
+        if: github.event.client_payload.chat_id && env.TG_MSG_ID != ''
+        run: |
+          ACTION="${{ github.event.action }}"
+          if [ "$ACTION" = "terraform_apply" ]; then
+            MSG="🖥️ *Infrastructure provisioned*... configuring K8s next."
+          else
+            MSG="🗑 *Infrastructure destroyed*."
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
+            -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d message_id="${{ env.TG_MSG_ID }}" \
+            -d text="$MSG" \
+            -d parse_mode=Markdown
 
       - name: Store kubeconfig in SSM
         if: github.event.action == 'terraform_apply' && success()
@@ -115,31 +143,29 @@ jobs:
             --region eu-central-1 || true
 
       - name: Notify Telegram - Success
-        if: success() && github.event.client_payload.chat_id
+        if: success() && github.event.client_payload.chat_id && env.TG_MSG_ID != ''
         run: |
           ACTION="${{ github.event.action }}"
           if [ "$ACTION" = "terraform_apply" ]; then
-            MSG="✅ *Deploy complete!* Cluster is up."
+            MSG="✅ *Deploy complete!* Cluster is up and ready."
           else
-            MSG="✅ *Destroy complete!* Cluster is down."
+            MSG="✅ *Destroy complete!* Cluster is fully removed."
           fi
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
             -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d message_id="${{ env.TG_MSG_ID }}" \
             -d text="$MSG" \
             -d parse_mode=Markdown \
             -d reply_markup='{"inline_keyboard":[[{"text":"Back to Menu","callback_data":"menu"}]]}'
 
       - name: Notify Telegram - Failure
-        if: failure() && github.event.client_payload.chat_id
+        if: failure() && github.event.client_payload.chat_id && env.TG_MSG_ID != ''
         run: |
           ACTION="${{ github.event.action }}"
-          if [ "$ACTION" = "terraform_apply" ]; then
-            MSG="❌ *Deploy failed.* Check GitHub Actions logs."
-          else
-            MSG="❌ *Destroy failed.* Check GitHub Actions logs."
-          fi
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          MSG="❌ *Failed* during step: $ACTION. Check GitHub logs for details."
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
             -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d message_id="${{ env.TG_MSG_ID }}" \
             -d text="$MSG" \
             -d parse_mode=Markdown \
             -d reply_markup='{"inline_keyboard":[[{"text":"Back to Menu","callback_data":"menu"}]]}'
