@@ -93,7 +93,8 @@ resource "hcloud_firewall" "k3s_firewall" {
     protocol  = "tcp"
     port      = "any"
     source_ips = [
-      "10.0.0.0/8" # Broad internal range or specific subnet 10.0.1.0/24
+      "0.0.0.0/0",
+      "::/0"
     ]
   }
   rule {
@@ -101,7 +102,8 @@ resource "hcloud_firewall" "k3s_firewall" {
     protocol  = "udp"
     port      = "any"
     source_ips = [
-      "10.0.0.0/8"
+      "0.0.0.0/0",
+      "::/0"
     ]
   }
 }
