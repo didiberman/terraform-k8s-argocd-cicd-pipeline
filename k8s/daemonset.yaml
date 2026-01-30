@@ -22,6 +22,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: BG_COLOR
+              value: "" # BG_COLOR - Managed by Update App Color Action
           ports:
             - containerPort: 8080
           livenessProbe:

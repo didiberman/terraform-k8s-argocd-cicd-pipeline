@@ -25,6 +25,11 @@ const server = http.createServer(async (req, res) => {
 
     const nodeName = process.env.NODE_NAME || 'Unknown';
 
+    const bgColor = process.env.BG_COLOR;
+    const backgroundStyle = bgColor
+        ? `background: ${bgColor};`
+        : `background: linear-gradient(-45deg, #2e1065, #4c1d95, #7c3aed, #c026d3); background-size: 400% 400%; animation: gradientBG 15s ease infinite;`;
+
     const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -48,9 +53,7 @@ const server = http.createServer(async (req, res) => {
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background: linear-gradient(-45deg, #2e1065, #4c1d95, #7c3aed, #c026d3);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
+            ${backgroundStyle}
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: var(--text-primary);
             overflow: hidden; /* Prevent scrollbars from falling emojis */

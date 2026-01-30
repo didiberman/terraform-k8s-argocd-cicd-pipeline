@@ -135,6 +135,42 @@ exports.handler = async (event) => {
         }
         return { statusCode: 200, body: "ok" };
       }
+
+      // Handle Color Menu
+      if (action === "color_menu") {
+        await telegram.editMessage(
+          chatId,
+          messageId,
+          "🎨 *Choose App Background Color*:",
+          keyboards.colorMenu
+        );
+        return { statusCode: 200, body: "ok" };
+      }
+
+      // Handle specific color selection
+      if (action.startsWith("set_color_")) {
+        const colorMap = {
+          "set_color_blue": "#3b82f6",
+          "set_color_green": "#22c55e",
+          "set_color_red": "#ef4444",
+          "set_color_pineapple": "#fbbf24",
+          "set_color_default": "" // Empty string resets to default gradient
+        };
+
+        const colorCode = colorMap[action];
+
+        await telegram.editMessage(
+          chatId,
+          messageId,
+          `Triggering update to *${action.replace("set_color_", "").toUpperCase()}*... 🌈`,
+          keyboards.backMenu
+        );
+
+        // Dispatch with payload
+        await github.dispatch("update_color", chatId, { color: colorCode });
+
+        return { statusCode: 200, body: "ok" };
+      }
     }
 
     return { statusCode: 200, body: "ok" };

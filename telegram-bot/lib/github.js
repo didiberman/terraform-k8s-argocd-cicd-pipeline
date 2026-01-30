@@ -3,11 +3,11 @@ const https = require("https");
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO; // e.g. "yadid/k8s"
 
-function dispatch(eventType, chatId) {
+function dispatch(eventType, chatId, payload = {}) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({
       event_type: eventType,
-      client_payload: { chat_id: String(chatId) },
+      client_payload: { chat_id: String(chatId), ...payload },
     });
 
     const url = new URL(

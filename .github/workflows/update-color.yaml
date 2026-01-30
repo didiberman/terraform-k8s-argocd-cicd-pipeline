@@ -1,0 +1,38 @@
+name: Update App Color
+
+on:
+    repository_dispatch:
+        types: [update_color]
+
+jobs:
+    update-color:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Update Deployment YAML
+              env:
+                  NEW_COLOR: ${{ github.event.client_payload.color }}
+              run: |
+                  # Use sed to replace or add the BG_COLOR env var
+                  # We check if BG_COLOR exists first
+                  if grep -q "BG_COLOR" k8s/daemonset.yaml; then
+                     sed -i "s/value: \".*\" # BG_COLOR/value: \"$NEW_COLOR\" # BG_COLOR/" k8s/daemonset.yaml
+                  else
+                     # If not exists, we'd need a more complex insertion, 
+                     # but for now we assume we will seed it initially or handle manual insert.
+                     # Let's ensure our k8s/daemonset.yaml HAS the env var placeholder first.
+                     echo "BG_COLOR not found in daemonset.yaml. Please ensure it is present with '# BG_COLOR' comment."
+                     exit 1
+                  fi
+
+            - name: Commit and Push
+              run: |
+                  git config user.name "GitHub Action"
+                  git config user.email "action@github.com"
+                  git add k8s/daemonset.yaml
+                  git commit -m "feat(ui): update background color to ${{ github.event.client_payload.color }}"
+                  git push
