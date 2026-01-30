@@ -194,7 +194,7 @@ resource "hcloud_server" "worker3" {
 resource "cloudflare_record" "k8s_lbs" {
   zone_id = var.cloudflare_zone_id
   name    = "k8s"
-  value   = hcloud_server.master.ipv4_address
+  content = hcloud_server.master.ipv4_address
   type    = "A"
   proxied = false
 }
@@ -249,4 +249,8 @@ resource "null_resource" "k8s_bootstrap" {
 
 output "kubeconfig_command" {
   value = "scp -i ~/.ssh/id_rsa root@${hcloud_server.master.ipv4_address}:/etc/rancher/k3s/k3s.yaml ~/.kube/k3s-hetzner.yaml && sed -i '' 's/127.0.0.1/${hcloud_server.master.ipv4_address}/g' ~/.kube/k3s-hetzner.yaml"
+}
+
+output "argocd_password_command" {
+  value = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo"
 }
