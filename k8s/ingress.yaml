@@ -4,8 +4,11 @@ metadata:
   name: sample-app
   namespace: default
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
+  tls:
+    - hosts:
+        - k8s.didiberman.com
   rules:
     - host: k8s.didiberman.com
       http:
