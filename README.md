@@ -1,94 +1,146 @@
-# Hetzner Cloud K3s GitOps Pipeline
+# 🍍 Terraform K8s ArgoCD Pipeline (Hetzner + Cloudflare)
 
-This project serves as a reference implementation for a modern, GitOps-based CI/CD pipeline on **Hetzner Cloud** using **K3s**.
+A fully automated, zero-touch infrastructure pipeline that provisions a **K3s Kubernetes Cluster** on Hetzner Cloud, sets up **ArgoCD** for GitOps, and exposes services securely via **Cloudflare Proxy**.
 
-It demonstrates how to bootstrap a Kubernetes cluster using Terraform and manage application deployment automatically using GitHub Actions and ArgoCD.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-active-success.svg)
+![Pineapples](https://img.shields.io/badge/pineapples-100%25-yellow.svg)
 
-## 🚀 Architecture
+## 🚀 Key Features
 
-The pipeline follows a GitOps workflow where the configuration in this repository is the source of truth. Includes automated **Testing** and **Observability**.
+- **Infrastructure as Code**: Terraform provisions VMs, Firewalls, Private Networks, and Cloudflare DNS records.
+- **Automated Bootstrap**: Cloud-Init & Remote-Exec automatically install K3s, ArgoCD, and required CRDs. No manual `kubectl` required.
+- **GitOps First**: ArgoCD watches this repo (`k8s/`) to manage the application loop.
+- **Secure Networking**:
+    - **Cloudflare Proxy**: Hides origin server IP. SSL Termination at the edge (Flexible/Full).
+    - **Hetzner Firewall**: Strict rules allowing only Clouflare, Internal CNI, and SSH.
+    - **Private Network**: K3s nodes communicate over a private `10.0.1.0/24` network.
+- **Observability**: Prometheus & Grafana stack included (managed via ArgoCD).
+- **Fun Demo App**: A Node.js app featuring real-time metrics, visuals, and... falling pineapples 🍍.
+
+## 🏗 Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Infrastructure
-        tf[Terraform] -->|Provisions| hcloud[Hetzner Cloud VMs]
-        script[Cloud-Init] -->|Installs| k3s[K3s Cluster]
+    user((User)) -->|HTTPS| cf[Cloudflare Edge]
+    subgraph Hetzner Cloud
+        cf -->|Proxied| ingress[Traefik Ingress]
+        ingress -->|Route| svc[NodeJS App]
+        
+        subgraph Control Plane
+            k3s[K3s Master]
+            argo[ArgoCD]
+        end
+        
+        subgraph Workers
+            w1[Worker 1]
+            w2[Worker 2]
+        end
     end
-
-    subgraph CI ["CI: GitHub Actions"]
-        push[Git Push] -->|Triggers| gh_actions[GitHub Actions]
-        gh_actions -->|Run Tests| unit_tests[Unit Tests]
-        unit_tests -->|Builds & Pushes| ghcr[GHCR Registry]
-        ghcr -->|Updates Tag| manifest[K8s Manifests]
-    end
-
-    subgraph CD ["CD: ArgoCD"]
-        manifest -.->|Watched by| argocd[ArgoCD]
-        argocd -->|Syncs| k3s
-        k3s -->|Verifies| probes[Health Probes]
-        argocd -->|Triggers| smoke[Smoke Test Job]
-    end
-
-    subgraph Obs ["Observability"]
-        prom[Prometheus] -->|Scrapes| k3s
-        graf[Grafana] -->|Visualizes| prom
-    end
+    
+    argo -->|Syncs| repo[GitHub Repo]
+    tf[Terraform] -->|Provisions| Hetzner
+    tf -->|Configures| cf
 ```
-
-## 🧪 Testing Strategy
-
-This pipeline implements a multi-layer testing strategy:
-
-1.  **CI Layer (Pre-Merge)**:
-    *   **Unit Tests**: Run via `npm test` in GitHub Actions. Blocks the build if logic fails.
-2.  **CD Layer (Deployment)**:
-    *   **Health Probes**: Kubernetes `liveness` (restart if dead) and `readiness` (don't route traffic until ready) probes.
-3.  **Post-Deployment Layer**:
-    *   **Smoke Tests**: An ArgoCD `PostSync` hook (Job) that curls the application to verify end-to-end connectivity.
-
-## 📊 Observability
-
-*   **Prometheus**: Installed via `kube-prometheus-stack`. Automatically scrapes the app using `ServiceMonitor`.
-*   **Grafana**: Visualization dashboards.
-*   **Metrics**: Application exposes custom metrics at `/metrics` (e.g., HTTP request counts).
 
 ## 🛠 Tech Stack
 
--   **Cloud Provider**: [Hetzner Cloud](https://hetzner.cloud) (Cost-effective, reliable)
--   **Orchestrator**: [K3s](https://k3s.io) (Lightweight Kubernetes)
--   **Infrastructure as Code**: [Terraform](https://www.terraform.io/)
--   **CI**: [GitHub Actions](https://github.com/features/actions)
--   **CD**: [ArgoCD](https://argo-cd.readthedocs.io/)
--   **Registry**: GitHub Container Registry (ghcr.io)
--   **Application**: Node.js (Sample) with `prom-client`
+- **Cloud**: Hetzner Cloud (Compute), Cloudflare (DNS/CDN)
+- **Cluster**: [K3s](https://k3s.io) (Lightweight Kubernetes)
+- **IaC**: [Terraform](https://www.terraform.io/)
+- **GitOps**: [ArgoCD](https://argo-cd.readthedocs.io/)
+- **CI**: GitHub Actions (Build -> Test -> Push to GHCR)
+- **Language**: Node.js (App), HCL (Infra), YAML (Manifests)
+
+---
+
+## 🏁 Quick Start
+
+### 1. Prerequisites
+- **Hetzner Cloud Token**: Read/Write access.
+- **Cloudflare API Token**: Zone DNS Edit access.
+- **Cloudflare Zone ID**: The ID of the domain you own (e.g., `didiberman.com`).
+
+### 2. Configure Infrastructure
+Clone the repo and configure your secrets.
+
+```bash
+cd infra
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars`:
+```hcl
+hcloud_token       = "your-hetzner-token"
+cloudflare_api_token = "your-cloudflare-token"
+cloudflare_zone_id   = "your-zone-id"
+```
+
+### 3. Provision & Bootstrap
+Run Terraform to build the cluster and install ArgoCD and the App.
+
+```bash
+terraform init
+terraform apply
+```
+
+> **What happens here?**
+> 1. Terraform creates Servers, Firewalls, and Networks.
+> 2. Cloud-Init installs K3s on the master and joins workers.
+> 3. Terraform uses `remote-exec` to wait for the cluster, then installs ArgoCD & Cert-Manager manifests directly.
+> 4. ArgoCD takes over and deploys the application.
+
+### 4. Access the Cluster
+Terraform outputs commands to set up your local environment:
+
+**Get Kubeconfig:**
+```bash
+# Run the command output by Terraform to copy kubeconfig
+$(terraform output -raw kubeconfig_command)
+```
+
+**Get ArgoCD Admin Password:**
+```bash
+# Retrieve the initial admin password
+$(terraform output -raw argocd_password_command)
+```
+
+### 5. Access the Application
+- **App URL**: `https://k8s.didiberman.com` (Pineapples falling!) 🍍
+- **ArgoCD UI**: Access via Port Forwarding:
+  ```bash
+  kubectl port-forward svc/argocd-server -n argocd 8080:443
+  # Open https://localhost:8080
+  ```
+
+---
 
 ## 📂 Project Structure
 
 ```text
 .
 ├── .github/workflows/   # CI/CD Workflows (GitHub Actions)
-├── infra/               # Terraform Infrastructure Code
-├── k8s/                 # Kubernetes Manifests (The "GitOps" State)
-├── src/                 # Application Source Code
-└── Dockerfile           # App Container Definition
+├── infra/               # Terraform (Hetzner + Cloudflare + Bootstrap)
+│   ├── main.tf          # Main Infrastructure Definition
+│   ├── cloud-init.yaml  # Server User Data
+│   └── terraform.tfvars # (Ignored) Secrets
+├── k8s/                 # Kubernetes Manifests (GitOps)
+│   ├── argocd-app.yaml  # Root Application (App of Apps)
+│   ├── ingress.yaml     # Traefik Ingress Route
+│   └── ...              # Deployment, Service, Monitoring
+├── src/                 # Node.js Application
+└── README.md            # You are here
 ```
 
-## 🏁 Getting Started
+## 🐛 Troubleshooting
 
-### 1. Prerequisites
--   Hetzner Cloud API Token
--   Local `terraform` and `kubectl` installed.
+**Issue: `curl` or Browser returns 522 (Cloudflare Timeout)**
+- **Cause**: The cluster firewall is blocking Cloudflare IPs.
+- **Fix**: Ensure your `infra/main.tf` firewall rules allow TCP 80/443 from `0.0.0.0/0`.
 
-### 2. Provision Infrastructure
-```bash
-cd infra
-terraform init
-terraform apply
-# Enter your HCloud Token when prompted
-```
+**Issue: ArgoCD Sync Stuck**
+- **Cause**: Race condition with CRDs (e.g., Prometheus `ServiceMonitor`).
+- **Fix**: The repo uses `sync-wave` annotations (`-1`) to ensure CRDs install first. If stuck, delete the `monitoring` app in ArgoCD and resync.
 
-### 3. Deploy
-1.  Push this repository to GitHub.
-2.  Add your `HCLOUD_TOKEN` to GitHub Secrets (optional, used if extending CI for Infra).
-3.  The **GitHub Action** will automatically build the app and update the `k8s/deployment.yaml` file with the new image tag.
-4.  Install ArgoCD on your cluster and apply `k8s/argocd-app.yaml`.
+---
+*Built with ❤️ and 🍍 by Antigravity*
