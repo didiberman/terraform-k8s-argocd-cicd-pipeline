@@ -38,4 +38,5 @@ jobs:
                   git config user.email "action@github.com"
                   git add k8s/daemonset.yaml
                   git commit -m "feat(ui): update background color to ${{ github.event.client_payload.color }}"
+                  git pull --rebase
                   git push
