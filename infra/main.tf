@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     hcloud = {
-      source = "hetznercloud/hcloud"
+      source  = "hetznercloud/hcloud"
       version = "1.49.1"
     }
   }
@@ -61,7 +61,7 @@ resource "hcloud_firewall" "k3s_firewall" {
       "::/0"
     ]
   }
-    rule {
+  rule {
     direction = "in"
     protocol  = "tcp"
     port      = "443"
@@ -73,21 +73,22 @@ resource "hcloud_firewall" "k3s_firewall" {
 }
 
 resource "hcloud_server" "master" {
-  name        = "k3s-master"
-  image       = "ubuntu-22.04"
-  server_type = "cx22" # Smallest available
-  location    = "nbg1"
-  ssh_keys    = [hcloud_ssh_key.default.id]
+  name         = "k3s-master"
+  image        = "ubuntu-22.04"
+  server_type  = "cx23" # Smallest available
+  location     = "nbg1"
+  ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
-  
+
   network {
     network_id = hcloud_network.k3s_net.id
     ip         = "10.0.1.5"
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role = "server"
-    token = "secretk3stoken" # In prod, use random string
+    role      = "server"
+    token     = "secretk3stoken" # In prod, use random string
+    master_ip = ""               # Not used for server role, but required by template
   })
 
   depends_on = [
@@ -96,11 +97,11 @@ resource "hcloud_server" "master" {
 }
 
 resource "hcloud_server" "worker" {
-  name        = "k3s-worker-1"
-  image       = "ubuntu-22.04"
-  server_type = "cx22"
-  location    = "nbg1"
-  ssh_keys    = [hcloud_ssh_key.default.id]
+  name         = "k3s-worker-1"
+  image        = "ubuntu-22.04"
+  server_type  = "cx23"
+  location     = "nbg1"
+  ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
 
   network {
@@ -109,9 +110,34 @@ resource "hcloud_server" "worker" {
   }
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role  = "agent"
-    token = "secretk3stoken"
-    master_ip = hcloud_server.master.network[*].ip[0] # Internal IP
+    role      = "agent"
+    token     = "secretk3stoken"
+    master_ip = "10.0.1.5" # Master's internal IP from network block
+  })
+
+  depends_on = [
+    hcloud_network_subnet.k3s_subnet,
+    hcloud_server.master
+  ]
+}
+
+resource "hcloud_server" "worker2" {
+  name         = "k3s-worker-2"
+  image        = "ubuntu-22.04"
+  server_type  = "cx23"
+  location     = "nbg1"
+  ssh_keys     = [hcloud_ssh_key.default.id]
+  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+
+  network {
+    network_id = hcloud_network.k3s_net.id
+    ip         = "10.0.1.7"
+  }
+
+  user_data = templatefile("${path.module}/cloud-init.yaml", {
+    role      = "agent"
+    token     = "secretk3stoken"
+    master_ip = "10.0.1.5" # Master's internal IP from network block
   })
 
   depends_on = [
