@@ -244,20 +244,29 @@ resource "null_resource" "k8s_bootstrap" {
     user        = "root"
     private_key = file("~/.ssh/id_rsa")
     host        = hcloud_server.master.ipv4_address
+    timeout     = "10m"
   }
 
   provisioner "remote-exec" {
     inline = [
-      "echo 'Waiting for K3s to be ready...'",
-      "until kubectl get nodes; do sleep 5; done",
+      "echo '🚀 Master node reached. Waiting 30s for cloud-init to stabilize...'",
+      "sleep 30",
 
-      "echo 'Installing ArgoCD...'",
+      "echo '⏳ Waiting for kubectl binary to be available...'",
+      "until [ -f /usr/local/bin/kubectl ]; do echo '...still waiting for k3s install...'; sleep 10; done",
+
+      "echo '⏳ Waiting for K3s nodes to be Ready...'",
+      "until kubectl get nodes | grep -q 'Ready'; do echo '...waiting for nodes to report ready...'; sleep 10; done",
+
+      "echo '📦 Installing ArgoCD...'",
       "kubectl create namespace argocd || true",
       "kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml",
+      "echo '⏳ Waiting for ArgoCD Server...'",
       "kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s",
 
-      "echo 'Installing Cert-Manager...'",
+      "echo '🛡️ Installing Cert-Manager...'",
       "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml",
+      "echo '⏳ Waiting for Cert-Manager...'",
       "kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s",
     ]
   }
