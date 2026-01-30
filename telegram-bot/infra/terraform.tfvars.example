@@ -1,0 +1,4 @@
+telegram_bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+github_token       = "YOUR_GITHUB_TOKEN"
+allowed_username   = "yadidians"
+github_repo        = "yadid/k8s"

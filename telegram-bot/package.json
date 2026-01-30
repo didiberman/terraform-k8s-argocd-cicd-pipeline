@@ -1,0 +1,12 @@
+{
+  "name": "k8s-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for K8s cluster management via AWS Lambda",
+  "main": "handler.js",
+  "scripts": {
+    "deploy": "bash deploy.sh"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.978.0"
+  }
+}

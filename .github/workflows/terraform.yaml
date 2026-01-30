@@ -1,0 +1,145 @@
+name: Terraform
+
+on:
+  repository_dispatch:
+    types: [terraform_apply, terraform_destroy]
+
+env:
+  TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+  TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: eu-central-1
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Set SSH public key variable
+        run: echo "TF_VAR_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" >> "$GITHUB_ENV"
+
+      - name: Notify Telegram - Started
+        if: github.event.client_payload.chat_id
+        run: |
+          ACTION="${{ github.event.action }}"
+          if [ "$ACTION" = "terraform_apply" ]; then
+            MSG="🚀 *Terraform Apply* started..."
+          else
+            MSG="🗑 *Terraform Destroy* started..."
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d text="$MSG" \
+            -d parse_mode=Markdown
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform Apply
+        if: github.event.action == 'terraform_apply'
+        working-directory: infra
+        run: terraform apply -auto-approve
+
+      - name: Terraform Destroy
+        if: github.event.action == 'terraform_destroy'
+        working-directory: infra
+        run: terraform destroy -auto-approve
+
+      - name: Store kubeconfig in SSM
+        if: github.event.action == 'terraform_apply' && success()
+        working-directory: infra
+        run: |
+          MASTER_IP=$(terraform output -raw master_ip)
+
+          # Wait for SSH to be available
+          for i in $(seq 1 30); do
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i ~/.ssh/id_rsa root@"$MASTER_IP" "echo ready" && break
+            echo "Waiting for SSH... ($i/30)"
+            sleep 10
+          done
+
+          # Wait for k3s to generate the kubeconfig
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@"$MASTER_IP" \
+            "until [ -f /etc/rancher/k3s/k3s.yaml ]; do sleep 5; done"
+
+          # Copy kubeconfig
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            root@"$MASTER_IP":/etc/rancher/k3s/k3s.yaml /tmp/k3s.yaml
+
+          # Replace localhost with public IP
+          sed -i "s/127.0.0.1/$MASTER_IP/g" /tmp/k3s.yaml
+
+          # Extract fields into JSON
+          SERVER=$(grep 'server:' /tmp/k3s.yaml | awk '{print $2}')
+          CA_DATA=$(grep 'certificate-authority-data:' /tmp/k3s.yaml | awk '{print $2}')
+          CLIENT_CERT=$(grep 'client-certificate-data:' /tmp/k3s.yaml | awk '{print $2}')
+          CLIENT_KEY=$(grep 'client-key-data:' /tmp/k3s.yaml | awk '{print $2}')
+
+          KUBECONFIG_JSON=$(jq -n \
+            --arg server "$SERVER" \
+            --arg ca "$CA_DATA" \
+            --arg cert "$CLIENT_CERT" \
+            --arg key "$CLIENT_KEY" \
+            '{server: $server, ca: $ca, clientCert: $cert, clientKey: $key}')
+
+          aws ssm put-parameter \
+            --name "/k8s/kubeconfig" \
+            --type SecureString \
+            --value "$KUBECONFIG_JSON" \
+            --overwrite \
+            --region eu-central-1
+
+      - name: Clear kubeconfig from SSM
+        if: github.event.action == 'terraform_destroy' && success()
+        run: |
+          aws ssm delete-parameter \
+            --name "/k8s/kubeconfig" \
+            --region eu-central-1 || true
+
+      - name: Notify Telegram - Success
+        if: success() && github.event.client_payload.chat_id
+        run: |
+          ACTION="${{ github.event.action }}"
+          if [ "$ACTION" = "terraform_apply" ]; then
+            MSG="✅ *Deploy complete!* Cluster is up."
+          else
+            MSG="✅ *Destroy complete!* Cluster is down."
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d text="$MSG" \
+            -d parse_mode=Markdown \
+            -d reply_markup='{"inline_keyboard":[[{"text":"Back to Menu","callback_data":"menu"}]]}'
+
+      - name: Notify Telegram - Failure
+        if: failure() && github.event.client_payload.chat_id
+        run: |
+          ACTION="${{ github.event.action }}"
+          if [ "$ACTION" = "terraform_apply" ]; then
+            MSG="❌ *Deploy failed.* Check GitHub Actions logs."
+          else
+            MSG="❌ *Destroy failed.* Check GitHub Actions logs."
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.client_payload.chat_id }}" \
+            -d text="$MSG" \
+            -d parse_mode=Markdown \
+            -d reply_markup='{"inline_keyboard":[[{"text":"Back to Menu","callback_data":"menu"}]]}'

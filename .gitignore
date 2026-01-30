@@ -38,3 +38,7 @@ terraform.rc
 /.agent
 /src/node_modules
 infra/.terraform.lock.hcl
+telegram-bot/node_modules/
+telegram-bot/function.zip
+telegram-bot/infra/.terraform.lock.hcl
+telegram-bot/infra/function.zip

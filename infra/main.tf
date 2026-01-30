@@ -9,6 +9,14 @@ terraform {
       version = "~> 4.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "k8s-terraform-state-yadid"
+    key            = "terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "k8s-terraform-lock"
+    encrypt        = true
+  }
 }
 
 variable "hcloud_token" {
@@ -23,6 +31,11 @@ variable "cloudflare_zone_id" {
   type = string
 }
 
+variable "ssh_public_key" {
+  type    = string
+  default = ""
+}
+
 provider "hcloud" {
   token = var.hcloud_token
 }
@@ -31,9 +44,13 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+locals {
+  ssh_public_key = var.ssh_public_key != "" ? var.ssh_public_key : file("~/.ssh/id_rsa.pub")
+}
+
 resource "hcloud_ssh_key" "default" {
   name       = "k3s-ssh-key"
-  public_key = file("~/.ssh/id_rsa.pub") # Assumes user has this, otherwise we might need to generate one
+  public_key = local.ssh_public_key
 }
 
 resource "hcloud_network" "k3s_net" {
@@ -253,15 +270,9 @@ resource "null_resource" "k8s_bootstrap" {
     destination = "/root/argocd-app.yaml"
   }
 
-  provisioner "file" {
-    source      = "../k8s/cluster-issuer.yaml"
-    destination = "/root/cluster-issuer.yaml"
-  }
-
   provisioner "remote-exec" {
     inline = [
       "echo 'Applying Initial Configurations...'",
-      "kubectl apply -f /root/cluster-issuer.yaml",
       "kubectl apply -f /root/argocd-app.yaml"
     ]
   }
