@@ -158,7 +158,7 @@ const server = http.createServer(async (req, res) => {
     <div class="container">
         <h1>Request Served By</h1>
         <div class="node-name">${nodeName}</div>
-        
+
         <div class="info-box">
             <div class="info-title">⚡️ Behind the Scenes</div>
             <div class="info-content">
@@ -179,18 +179,18 @@ const server = http.createServer(async (req, res) => {
         const duration = 2000; // 2 seconds
         const interval = 50; // Update every 50ms
         let elapsed = 0;
-        
+
         const progressBar = document.getElementById('progressBar');
         const timerText = document.getElementById('timer');
-        
+
         const timer = setInterval(() => {
             elapsed += interval;
             const progress = (elapsed / duration) * 100;
             const remaining = Math.max(0, (duration - elapsed) / 1000).toFixed(1);
-            
+
             progressBar.style.width = \`\${progress}%\`;
             timerText.textContent = remaining;
-            
+
             if (elapsed >= duration) {
                 clearInterval(timer);
                 window.location.reload();
@@ -201,14 +201,14 @@ const server = http.createServer(async (req, res) => {
         function createPineapple() {
             const pineapple = document.createElement('div');
             pineapple.classList.add('pineapple');
-            pineapple.innerText = '🍍❤️';
-            
+            pineapple.innerText = '❤️';
+
             pineapple.style.left = Math.random() * 100 + 'vw';
-            
+
             // Random fall duration between 3s and 8s
             const fallDuration = Math.random() * 5 + 3;
             pineapple.style.animationDuration = fallDuration + 's';
-            
+
             // Random font size
             const size = Math.random() * 1.5 + 1;
             pineapple.style.fontSize = size + 'rem';
@@ -223,7 +223,7 @@ const server = http.createServer(async (req, res) => {
 
         // Spawn a pineapple every 800ms (not too many)
         setInterval(createPineapple, 800);
-        
+
         // Initial batch
         for(let i=0; i<5; i++) setTimeout(createPineapple, i * 400);
     </script>
