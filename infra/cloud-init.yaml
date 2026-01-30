@@ -1,0 +1,3 @@
+#cloud-config
+runcmd:
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="%{ if role == "agent" }agent --server https://${master_ip}:6443%{ else }server --tls-san $(curl http://169.254.169.254/hetzner/v1/metadata/public-ipv4)%{ endif } --token ${token}" sh -
