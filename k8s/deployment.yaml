@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: sample-app
-          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:latest # CI will update this tag
+          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:sha-00fc069ee9e471dad19a73c16c88ec576ddbcc47
           ports:
             - containerPort: 8080
           livenessProbe:
