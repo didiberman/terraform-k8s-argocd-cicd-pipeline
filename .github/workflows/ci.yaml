@@ -1,76 +1,76 @@
 name: CI/CD Pipeline
 
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-        branches: ["main"]
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 env:
-    REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-    build-and-push:
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write # Needed to commit back to the repo
-            packages: write # Needed to push to ghcr.io
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to commit back to the repo
+      packages: write # Needed to push to ghcr.io
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Log in to the Container registry
-              uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
-              with:
-                  registry: ${{ env.REGISTRY }}
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Extract metadata (tags, labels) for Docker
-              id: meta
-              uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
-              with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-                  tags: |
-                      type=sha,format=long
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
 
-            - name: Install Dependencies
-              run: npm ci
-              working-directory: src
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: src
 
-            - name: Run Unit Tests
-              run: npm test
-              working-directory: src
+      - name: Run Unit Tests
+        run: npm test
+        working-directory: src
 
-            - name: Build and push Docker image
-              uses: docker/build-push-action@v5 # Switched to tag for reliability
-              with:
-                  context: .
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5 # Switched to tag for reliability
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
-            - name: Update Kubernetes Manifest
-              if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-              run: |
-                  # Get the new image tag (sha-<full_sha>)
-                  NEW_TAG="sha-$(git rev-parse HEAD)"
-                  echo "Updating deployment to use tag: $NEW_TAG"
+      - name: Update Kubernetes Manifest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Get the new image tag (sha-<full_sha>)
+          NEW_TAG="sha-$(git rev-parse HEAD)"
+          echo "Updating deployment to use tag: $NEW_TAG"
 
-                  # Simple sed replacement. For robust YAML handling, we'd use yq.
-                  # Finds "ghcr.io/yadid/testkit:..." and replaces the tag.
-                  sed -i "s|ghcr.io/${{ github.repository }}:.*|ghcr.io/${{ github.repository }}:$NEW_TAG|" k8s/deployment.yaml
+          # Simple sed replacement. For robust YAML handling, we'd use yq.
+          # Finds "ghcr.io/yadid/testkit:..." and replaces the tag.
+          sed -i "s|ghcr.io/${{ github.repository }}:.*|ghcr.io/${{ github.repository }}:$NEW_TAG|" k8s/daemonset.yaml
 
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-                  # Commit and Push if changed
-                  if [[ -n $(git status --porcelain) ]]; then
-                    git add k8s/deployment.yaml
-                    git commit -m "CD: Update image tag to $NEW_TAG"
-                    git push
-                  else
-                    echo "No changes to manifest."
-                  fi
+          # Commit and Push if changed
+          if [[ -n $(git status --porcelain) ]]; then
+            git add k8s/daemonset.yaml
+            git commit -m "CD: Update image tag to $NEW_TAG"
+            git push
+          else
+            echo "No changes to manifest."
+          fi
