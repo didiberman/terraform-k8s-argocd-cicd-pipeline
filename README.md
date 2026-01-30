@@ -126,6 +126,7 @@ Manage your infrastructure directly from Telegram with real-time status updates.
 - **🗑 Destroy**: Safely tear down the infrastructure.
 - **📦 Get Pods**: View all running pods across the cluster.
 - **🖥 Get Nodes**: List cluster nodes with their **Status** and **IP Addresses**.
+- **📺 Live Logs**: Watch the deployment progress stream in real-time.
 
 ### Bot Setup
 The bot is deployed as an AWS Lambda function with an API Gateway webhook.
@@ -135,6 +136,7 @@ The bot is deployed as an AWS Lambda function with an API Gateway webhook.
     - `TELEGRAM_BOT_TOKEN`: Your API token.
     - `ALLOWED_USERNAME`: Restrict access to your Telegram handle.
     - `GITHUB_TOKEN`: PAT to trigger Actions.
+4.  **Credentials**: The specific Terraform apply output provides the `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` to use in your GitHub Secrets.
 
 ---
 
