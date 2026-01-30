@@ -128,7 +128,7 @@ resource "hcloud_firewall" "k3s_firewall" {
 resource "hcloud_server" "master" {
   name         = "k3s-master"
   image        = "ubuntu-22.04"
-  server_type  = "cx23" # Smallest available
+  server_type  = "cpx22" # Smallest available
   location     = "nbg1"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
@@ -153,7 +153,7 @@ resource "hcloud_server" "master" {
 resource "hcloud_server" "worker" {
   name         = "k3s-worker-1"
   image        = "ubuntu-22.04"
-  server_type  = "cx23"
+  server_type  = "cpx22"
   location     = "fsn1"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
@@ -179,7 +179,7 @@ resource "hcloud_server" "worker" {
 resource "hcloud_server" "worker2" {
   name         = "k3s-worker-2"
   image        = "ubuntu-22.04"
-  server_type  = "cx23"
+  server_type  = "cpx22"
   location     = "hel1"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
@@ -209,7 +209,7 @@ output "master_ip" {
 resource "hcloud_server" "worker3" {
   name         = "k3s-worker-3"
   image        = "ubuntu-22.04"
-  server_type  = "cx23"
+  server_type  = "cpx22"
   location     = "sin"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
@@ -235,7 +235,7 @@ resource "hcloud_server" "worker3" {
 resource "hcloud_server" "worker4" {
   name         = "k3s-worker-4"
   image        = "ubuntu-22.04"
-  server_type  = "cx23"
+  server_type  = "cpx22"
   location     = "hil"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
