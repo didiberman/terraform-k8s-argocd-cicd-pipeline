@@ -144,16 +144,20 @@ The bot is deployed as an AWS Lambda function with an API Gateway webhook.
 
 ```text
 .
-├── .github/workflows/   # CI/CD Workflows (GitHub Actions)
-├── infra/               # Terraform (Hetzner + Cloudflare + Bootstrap)
-│   ├── main.tf          # Main Infrastructure Definition
-│   ├── cloud-init.yaml  # Server User Data
-│   └── terraform.tfvars # (Ignored) Secrets
+├── .github/
+│   ├── scripts/         # Helper scripts (e.g., Log Streamer)
+│   └── workflows/       # CI/CD Workflows (Terraform Apply/Destroy)
+├── infra/               # K8s Infrastructure (Hetzner + Cloudflare)
+│   ├── main.tf          # Cluster & Network Definition
+│   └── cloud-init.yaml  # Server User Data
+├── telegram-bot/        # Bot Application & Infrastructure
+│   ├── infra/           # Persistent Infrastructure (Lambda, IAM, State Lock)
+│   ├── lib/             # Bot Logic (Telegram API, K8s Interactor)
+│   └── handler.js       # Lambda Entrypoint
 ├── k8s/                 # Kubernetes Manifests (GitOps)
 │   ├── argocd-app.yaml  # Root Application (App of Apps)
-│   ├── ingress.yaml     # Traefik Ingress Route
-│   └── ...              # Deployment, Service, Monitoring
-├── src/                 # Node.js Application
+│   └── ...              # Deployment, Ingress, Monitoring
+├── src/                 # Node.js Demo Application
 └── README.md            # You are here
 ```
 
@@ -167,5 +171,4 @@ The bot is deployed as an AWS Lambda function with an API Gateway webhook.
 - **Cause**: Race condition with CRDs (e.g., Prometheus `ServiceMonitor`).
 - **Fix**: The repo uses `sync-wave` annotations (`-1`) to ensure CRDs install first. If stuck, delete the `monitoring` app in ArgoCD and resync.
 
----
-*Built with ❤️ and 🍍 by Antigravity*
+
