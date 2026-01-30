@@ -44,6 +44,13 @@ resource "aws_iam_user_policy" "github_actions" {
           "ssm:DeleteParameter"
         ],
         "Resource" : "arn:aws:ssm:eu-central-1:*:parameter/k8s/*"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "iam:GetUser"
+        ],
+        "Resource" : "arn:aws:iam::*:user/github-actions-k8s-manager"
       }
     ]
   })
