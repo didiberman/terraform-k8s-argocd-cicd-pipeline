@@ -26,7 +26,8 @@ const server = http.createServer(async (req, res) => {
   // Handle Root Endpoint
   httpRequestCounter.inc({ method: req.method, status: 200 });
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Hello from Hetzner K3s! Version: 1.0.0\n');
+  const nodeName = process.env.NODE_NAME || 'Unknown';
+  res.end(`Hello from Hetzner K3s! Version: 1.0.0 (Node: ${nodeName})\n`);
 });
 
 const PORT = process.env.PORT || 8080;
