@@ -83,7 +83,7 @@ jobs:
         run: |
           touch terraform.log
           # Start streamer in background
-          ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🚀 *Terraform Apply Running...*" &
+          bash ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🚀 *Terraform Apply Running...*" &
           STREAMER_PID=$!
 
           # Run Terraform
@@ -102,7 +102,7 @@ jobs:
         run: |
           touch terraform.log
           # Start streamer in background
-          ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🗑️ *Terraform Destroy Running...*" &
+          bash ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🗑️ *Terraform Destroy Running...*" &
           STREAMER_PID=$!
 
           # Run Terraform
