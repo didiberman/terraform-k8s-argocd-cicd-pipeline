@@ -34,12 +34,11 @@ const server = http.createServer(async (req, res) => {
     <title>K3s Cluster Status</title>
     <style>
         :root {
-            --bg-color: #0f172a;
             --card-bg: rgba(30, 41, 59, 0.7);
             --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-color: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.3);
+            --text-secondary: #e2e8f0;
+            --accent-color: #fbbf24; /* Pineapple Yellow */
+            --accent-glow: rgba(251, 191, 36, 0.5);
             --success-color: #4ade80;
         }
         body {
@@ -49,12 +48,17 @@ const server = http.createServer(async (req, res) => {
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+            background: linear-gradient(-45deg, #2e1065, #4c1d95, #7c3aed, #c026d3);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: var(--text-primary);
+            overflow: hidden; /* Prevent scrollbars from falling emojis */
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
         .container {
             text-align: center;
@@ -68,7 +72,7 @@ const server = http.createServer(async (req, res) => {
             max-width: 600px;
             width: 90%;
             position: relative;
-            overflow: hidden;
+            z-index: 10;
         }
         h1 {
             font-size: 1.25rem;
@@ -137,6 +141,17 @@ const server = http.createServer(async (req, res) => {
             margin: 0 2px;
             color: var(--text-primary);
         }
+        .pineapple {
+            position: fixed;
+            top: -50px;
+            font-size: 2rem;
+            z-index: 1;
+            pointer-events: none;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -181,6 +196,36 @@ const server = http.createServer(async (req, res) => {
                 window.location.reload();
             }
         }, interval);
+
+        // Falling Pineapples Logic
+        function createPineapple() {
+            const pineapple = document.createElement('div');
+            pineapple.classList.add('pineapple');
+            pineapple.innerText = '🍍';
+            
+            pineapple.style.left = Math.random() * 100 + 'vw';
+            
+            // Random fall duration between 3s and 8s
+            const fallDuration = Math.random() * 5 + 3;
+            pineapple.style.animationDuration = fallDuration + 's';
+            
+            // Random font size
+            const size = Math.random() * 1.5 + 1;
+            pineapple.style.fontSize = size + 'rem';
+
+            document.body.appendChild(pineapple);
+
+            // Cleanup after animation
+            setTimeout(() => {
+                pineapple.remove();
+            }, fallDuration * 1000);
+        }
+
+        // Spawn a pineapple every 800ms (not too many)
+        setInterval(createPineapple, 800);
+        
+        // Initial batch
+        for(let i=0; i<5; i++) setTimeout(createPineapple, i * 400);
     </script>
 </body>
 </html>
