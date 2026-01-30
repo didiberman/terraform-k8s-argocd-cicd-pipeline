@@ -8,6 +8,7 @@ spec:
     app: sample-app
   ports:
     - protocol: TCP
+      name: http # Named port is best practice for ServiceMonitor
       port: 80
       targetPort: 8080
   type: ClusterIP # We will use Ingress or LoadBalancer later

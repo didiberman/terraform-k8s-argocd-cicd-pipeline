@@ -20,6 +20,18 @@ spec:
           image: ghcr.io/yadid/testkit:latest # CI will update this tag
           ports:
             - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
           resources:
             limits:
               memory: "128Mi"

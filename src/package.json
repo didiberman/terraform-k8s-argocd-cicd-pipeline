@@ -1,0 +1,13 @@
+{
+  "name": "hetzner-k3s-demo",
+  "version": "1.0.0",
+  "description": "Demo app for GitOps pipeline",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "prom-client": "^15.1.0"
+  }
+}
