@@ -240,7 +240,7 @@ resource "hcloud_server" "worker4" {
   name         = "k3s-worker-4"
   image        = "ubuntu-22.04"
   server_type  = "cpx22"
-  location     = "hil"
+  location     = "ash"
   ssh_keys     = [hcloud_ssh_key.default.id]
   firewall_ids = [hcloud_firewall.k3s_firewall.id]
 
