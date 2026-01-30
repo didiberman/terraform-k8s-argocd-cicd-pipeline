@@ -52,7 +52,9 @@ resource "aws_iam_user_policy" "github_actions" {
           "iam:ListAccessKeys",
           "iam:GetUserPolicy",
           "iam:ListUserPolicies",
-          "iam:PutUserPolicy"
+          "iam:PutUserPolicy",
+          "iam:DeleteUserPolicy",
+          "iam:DeleteAccessKey"
         ],
         "Resource" : "arn:aws:iam::*:user/github-actions-k8s-manager"
       }

@@ -49,9 +49,16 @@ jobs:
             -d text="$MSG" \
             -d parse_mode=Markdown)
 
+          # Debug response
+          echo "Telegram Response: $RESPONSE"
+
           # Capture message_id for subsequent edits
-          MSG_ID=$(echo "$RESPONSE" | jq -r '.result.message_id' || echo "")
-          echo "TG_MSG_ID=$MSG_ID" >> "$GITHUB_ENV"
+          MSG_ID=$(echo "$RESPONSE" | jq -r '.result.message_id // empty')
+          if [ -n "$MSG_ID" ] && [ "$MSG_ID" != "null" ]; then
+            echo "TG_MSG_ID=$MSG_ID" >> "$GITHUB_ENV"
+          else
+            echo "Failed to capture TG_MSG_ID"
+          fi
 
       - name: Terraform Init
         working-directory: infra
@@ -147,7 +154,7 @@ jobs:
         run: |
           ACTION="${{ github.event.action }}"
           if [ "$ACTION" = "terraform_apply" ]; then
-            MSG="✅ *Deploy complete!* Cluster is up and ready."
+            MSG="✅ *Deploy complete!* Cluster is up.\n🌐 [k8s.didiberman.com](https://k8s.didiberman.com)"
           else
             MSG="✅ *Destroy complete!* Cluster is fully removed."
           fi

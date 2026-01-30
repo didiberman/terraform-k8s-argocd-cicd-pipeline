@@ -9,11 +9,13 @@ A fully automated, zero-touch infrastructure pipeline that provisions a **K3s Ku
 ## 🚀 Key Features
 
 - **Infrastructure as Code**: Terraform provisions VMs, Firewalls, Private Networks, and Cloudflare DNS records.
+- **Remote State**: Securely stored in **AWS S3** with state locking via **DynamoDB**.
+- **Telegram Cluster Manager**: Control your entire cluster via Telegram (Deploy, Destroy, Get Logs, Get Nodes with IPs).
 - **Automated Bootstrap**: Cloud-Init & Remote-Exec automatically install K3s, ArgoCD, and required CRDs. No manual `kubectl` required.
 - **GitOps First**: ArgoCD watches this repo (`k8s/`) to manage the application loop.
 - **Secure Networking**:
     - **Cloudflare Proxy**: Hides origin server IP. SSL Termination at the edge (Flexible/Full).
-    - **Hetzner Firewall**: Strict rules allowing only Clouflare, Internal CNI, and SSH.
+    - **Hetzner Firewall**: Strict rules allowing only Cloudflare, Internal CNI, and SSH.
     - **Private Network**: K3s nodes communicate over a private `10.0.1.0/24` network.
 - **Observability**: Prometheus & Grafana stack included (managed via ArgoCD).
 - **Fun Demo App**: A Node.js app featuring real-time metrics, visuals, and... falling pineapples 🍍.
@@ -106,12 +108,33 @@ $(terraform output -raw argocd_password_command)
 ```
 
 ### 5. Access the Application
-- **App URL**: `https://k8s.didiberman.com` (Pineapples falling!) 🍍
+- **App URL**: [https://k8s.didiberman.com](https://k8s.didiberman.com) (Pineapples falling!) 🍍
 - **ArgoCD UI**: Access via Port Forwarding:
   ```bash
   kubectl port-forward svc/argocd-server -n argocd 8080:443
   # Open https://localhost:8080
   ```
+
+---
+
+## 🤖 Telegram Cluster Manager
+
+Manage your infrastructure directly from Telegram with real-time status updates.
+
+### Features
+- **🚀 Deploy**: Trigger a full Terraform Apply from your phone.
+- **🗑 Destroy**: Safely tear down the infrastructure.
+- **📦 Get Pods**: View all running pods across the cluster.
+- **🖥 Get Nodes**: List cluster nodes with their **Status** and **IP Addresses**.
+
+### Bot Setup
+The bot is deployed as an AWS Lambda function with an API Gateway webhook.
+1.  **Bot Token**: Create a bot via [@BotFather](https://t.me/botfather).
+2.  **Infrastructure**: Located in `telegram-bot/infra`.
+3.  **Environment**: 
+    - `TELEGRAM_BOT_TOKEN`: Your API token.
+    - `ALLOWED_USERNAME`: Restrict access to your Telegram handle.
+    - `GITHUB_TOKEN`: PAT to trigger Actions.
 
 ---
 

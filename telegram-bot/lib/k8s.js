@@ -81,7 +81,11 @@ async function getNodes() {
     const name = node.metadata.name;
     const ready = node.status.conditions.find((c) => c.type === "Ready");
     const status = ready && ready.status === "True" ? "Ready" : "NotReady";
-    return `\`${name}\` - ${status}`;
+    const ip =
+      node.status.addresses.find((a) => a.type === "ExternalIP")?.address ||
+      node.status.addresses.find((a) => a.type === "InternalIP")?.address ||
+      "no-ip";
+    return `\`${name}\` (${ip}) - ${status}`;
   });
   return lines.join("\n") || "No nodes found.";
 }
