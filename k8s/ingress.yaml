@@ -7,6 +7,16 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   rules:
+    - host: k8s.didiberman.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sample-app
+                port:
+                  number: 80
     - http:
         paths:
           - path: /
