@@ -85,7 +85,19 @@ async function getNodes() {
       node.status.addresses.find((a) => a.type === "ExternalIP")?.address ||
       node.status.addresses.find((a) => a.type === "InternalIP")?.address ||
       "no-ip";
-    return `\`${name}\` (${ip}) - ${status}`;
+
+    const locLabel = node.metadata.labels?.location || "unknown";
+    const locMap = {
+      nbg1: "🇩🇪 Nuremberg",
+      fsn1: "🇩🇪 Falkenstein",
+      hel1: "🇫🇮 Helsinki",
+      sin: "🇸🇬 Singapore",
+      ash: "🇺🇸 Ashburn",
+      hil: "🇺🇸 Hillsboro",
+    };
+    const locDisplay = locMap[locLabel] ? locMap[locLabel] : `(${locLabel})`;
+
+    return `\`${name}\` ${locDisplay} - ${status} (${ip})`;
   });
   return lines.join("\n") || "No nodes found.";
 }

@@ -243,7 +243,7 @@ const server = http.createServer(async (req, res) => {
         function createPineapple() {
             const pineapple = document.createElement('div');
             pineapple.classList.add('pineapple');
-            pineapple.innerText = '❤️';
+            pineapple.innerText = '🍍';
 
             pineapple.style.left = Math.random() * 100 + 'vw';
 
