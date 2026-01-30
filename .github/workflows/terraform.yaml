@@ -35,6 +35,9 @@ jobs:
       - name: Set SSH public key variable
         run: echo "TF_VAR_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" >> "$GITHUB_ENV"
 
+      - name: Set SSH public key variable
+        run: echo "TF_VAR_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" >> "$GITHUB_ENV"
+
       - name: Notify Telegram - Started
         if: github.event.client_payload.chat_id
         run: |
@@ -103,12 +106,40 @@ jobs:
       - name: Terraform Apply
         if: github.event.action == 'terraform_apply'
         working-directory: infra
-        run: terraform apply -auto-approve | tee -a ../terraform.log
+        env:
+          TG_MSG_ID: ${{ env.TG_MSG_ID }}
+          TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+        run: |
+          touch terraform.log
+          # Start streamer in background
+          ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🚀 *Terraform Apply Running...*" &
+          STREAMER_PID=$!
+
+          # Run Terraform
+          terraform apply -auto-approve -input=false -lock-timeout=10m | tee terraform.log
+
+          # Kill streamer
+          kill "$STREAMER_PID" || true
 
       - name: Terraform Destroy
         if: github.event.action == 'terraform_destroy'
         working-directory: infra
-        run: terraform destroy -auto-approve | tee -a ../terraform.log
+        env:
+          TG_MSG_ID: ${{ env.TG_MSG_ID }}
+          TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+        run: |
+          touch terraform.log
+          # Start streamer in background
+          ../.github/scripts/stream.sh "terraform.log" "$TG_CHAT_ID" "$TG_MSG_ID" "$TG_BOT_TOKEN" "🗑️ *Terraform Destroy Running...*" &
+          STREAMER_PID=$!
+
+          # Run Terraform
+          terraform destroy -auto-approve -input=false -lock-timeout=5m | tee terraform.log
+
+          # Kill streamer
+          kill "$STREAMER_PID" || true
 
       - name: Stop Live Stream
         if: always()
