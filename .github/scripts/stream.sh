@@ -6,6 +6,12 @@ MSG_ID="$3"
 BOT_TOKEN="$4"
 TITLE="$5"
 
+# Validate critical args
+if [ -z "$MSG_ID" ] || [ "$MSG_ID" == "null" ]; then
+  echo "Error: MSG_ID is empty. Cannot stream logs to Telegram."
+  exit 0
+fi
+
 echo "Starting streamer for $TITLE..."
 echo "Log file: $LOG_FILE"
 
@@ -14,7 +20,6 @@ while [ -f "$LOG_FILE" ]; do
   
   if [ -n "$TAIL" ]; then
     # Construct JSON payload
-    # Ensure message_id is treated as a number
     jq -n \
       --arg chat_id "$CHAT_ID" \
       --arg message_id "$MSG_ID" \

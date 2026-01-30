@@ -40,9 +40,9 @@ jobs:
         run: |
           ACTION="${{ github.event.action }}"
           if [ "$ACTION" = "terraform_apply" ]; then
-            MSG="🚀 *Terraform Plan & Apply* started..."
+            MSG="🚀 Terraform Plan and Apply started..."
           else
-            MSG="🗑 *Terraform Destroy* started..."
+            MSG="🗑 Terraform Destroy started..."
           fi
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ github.event.client_payload.chat_id }}" \
