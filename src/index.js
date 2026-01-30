@@ -9,29 +9,28 @@ client.collectDefaultMetrics({ register });
 
 // Create a custom counter metric
 const httpRequestCounter = new client.Counter({
-  name: 'http_requests_total',
-  help: 'Total number of HTTP requests',
-  labelNames: ['method', 'status'],
+    name: 'http_requests_total',
+    help: 'Total number of HTTP requests',
+    labelNames: ['method', 'status'],
 });
 register.registerMetric(httpRequestCounter);
 
 const server = http.createServer(async (req, res) => {
-  // Handle Metrics Endpoint
-  if (req.url === '/metrics') {
-    res.setHeader('Content-Type', register.contentType);
-    res.end(await register.metrics());
-    return;
-  }
+    // Handle Metrics Endpoint
+    if (req.url === '/metrics') {
+        res.setHeader('Content-Type', register.contentType);
+        res.end(await register.metrics());
+        return;
+    }
 
-  const nodeName = process.env.NODE_NAME || 'Unknown';
+    const nodeName = process.env.NODE_NAME || 'Unknown';
 
-  const html = `
+    const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="2">
     <title>K3s Cluster Status</title>
     <style>
         :root {
@@ -41,6 +40,7 @@ const server = http.createServer(async (req, res) => {
             --text-secondary: #94a3b8;
             --accent-color: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.3);
+            --success-color: #4ade80;
         }
         body {
             margin: 0;
@@ -58,7 +58,7 @@ const server = http.createServer(async (req, res) => {
         }
         .container {
             text-align: center;
-            padding: 4rem;
+            padding: 3rem;
             background: var(--card-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -67,44 +67,75 @@ const server = http.createServer(async (req, res) => {
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             max-width: 600px;
             width: 90%;
-            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 500;
             color: var(--text-secondary);
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             letter-spacing: 0.05em;
             text-transform: uppercase;
         }
         .node-name {
-            font-size: 4rem;
+            font-size: 3.5rem;
             font-weight: 800;
             margin: 0;
             background: linear-gradient(135deg, #fff 0%, var(--accent-color) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 30px var(--accent-glow);
-            animation: pulse 2s infinite;
+            margin-bottom: 2rem;
         }
-        .meta {
-            margin-top: 3rem;
-            display: flex;
-            justify-content: center;
-            gap: 1.5rem;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            position: absolute;
+            bottom: 0;
+            left: 0;
         }
-        .badge {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 0.5rem 1rem;
-            border-radius: 9999px;
+        .progress-bar {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        .info-box {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            text-align: left;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.02); opacity: 0.9; }
-            100% { transform: scale(1); opacity: 1; }
+        .info-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--success-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .info-content {
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .refresh-text {
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        .pill {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin: 0 2px;
+            color: var(--text-primary);
         }
     </style>
 </head>
@@ -112,20 +143,53 @@ const server = http.createServer(async (req, res) => {
     <div class="container">
         <h1>Request Served By</h1>
         <div class="node-name">${nodeName}</div>
-        <div class="meta">
-            <span class="badge">V1.0.0</span>
-            <span class="badge">Hetzner Cloud</span>
-            <span class="badge">K3s</span>
+        
+        <div class="info-box">
+            <div class="info-title">⚡️ Behind the Scenes</div>
+            <div class="info-content">
+                Traffic flows from <span class="pill">Cloudflare</span> to the <span class="pill">Traefik Ingress</span>, which load-balances requests across 3 worker nodes.
+                <br><br>
+                <strong>The Pipeline:</strong>
+                Code Push ➔ GitHub Actions (CI) ➔ GHCR ➔ ArgoCD (CD) ➔ K3s Cluster
+            </div>
+        </div>
+
+        <div class="refresh-text">Refreshing in <span id="timer">2.0</span>s</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
         </div>
     </div>
+
+    <script>
+        const duration = 2000; // 2 seconds
+        const interval = 50; // Update every 50ms
+        let elapsed = 0;
+        
+        const progressBar = document.getElementById('progressBar');
+        const timerText = document.getElementById('timer');
+        
+        const timer = setInterval(() => {
+            elapsed += interval;
+            const progress = (elapsed / duration) * 100;
+            const remaining = Math.max(0, (duration - elapsed) / 1000).toFixed(1);
+            
+            progressBar.style.width = \`\${progress}%\`;
+            timerText.textContent = remaining;
+            
+            if (elapsed >= duration) {
+                clearInterval(timer);
+                window.location.reload();
+            }
+        }, interval);
+    </script>
 </body>
 </html>
 `;
-  res.writeHead(200, { 'Content-Type': 'text/html' });
-  res.end(html);
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(html);
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
