@@ -64,6 +64,3 @@ terraform apply
 2.  Add your `HCLOUD_TOKEN` to GitHub Secrets (optional, used if extending CI for Infra).
 3.  The **GitHub Action** will automatically build the app and update the `k8s/deployment.yaml` file with the new image tag.
 4.  Install ArgoCD on your cluster and apply `k8s/argocd-app.yaml`.
-
-## 🤝 Contributing
-Feel free to open issues or PRs to improve this template!
