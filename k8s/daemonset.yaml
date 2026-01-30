@@ -23,7 +23,7 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: BG_COLOR
-              value: "#fbbf24" # BG_COLOR - Managed by Update App Color Action
+              value: "" # BG_COLOR - Managed by Update App Color Action
             - name: NODE_LOCATION_FILE
               value: "/app/config/location"
           ports:
