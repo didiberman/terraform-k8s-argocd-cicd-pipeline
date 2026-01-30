@@ -4,12 +4,19 @@ const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
 const ssm = new SSMClient({ region: "eu-central-1" });
 
 async function getKubeconfig() {
-  const cmd = new GetParameterCommand({
-    Name: "/k8s/kubeconfig",
-    WithDecryption: true,
-  });
-  const result = await ssm.send(cmd);
-  return JSON.parse(result.Parameter.Value);
+  try {
+    const cmd = new GetParameterCommand({
+      Name: "/k8s/kubeconfig",
+      WithDecryption: true,
+    });
+    const result = await ssm.send(cmd);
+    return JSON.parse(result.Parameter.Value);
+  } catch (err) {
+    if (err.name === "ParameterNotFound") {
+      return null;
+    }
+    throw err;
+  }
 }
 
 function k8sRequest(kubeconfig, path) {
@@ -51,6 +58,7 @@ function k8sRequest(kubeconfig, path) {
 
 async function getPods() {
   const kubeconfig = await getKubeconfig();
+  if (!kubeconfig) return "No infrastructure alive. Please deploy first.";
   const data = await k8sRequest(kubeconfig, "/api/v1/pods");
   if (!data.items) return "No pods found or unexpected response.";
 
@@ -65,6 +73,7 @@ async function getPods() {
 
 async function getNodes() {
   const kubeconfig = await getKubeconfig();
+  if (!kubeconfig) return "No infrastructure alive. Please deploy first.";
   const data = await k8sRequest(kubeconfig, "/api/v1/nodes");
   if (!data.items) return "No nodes found or unexpected response.";
 
