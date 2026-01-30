@@ -4,6 +4,10 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "1.49.1"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -11,8 +15,20 @@ variable "hcloud_token" {
   sensitive = true
 }
 
+variable "cloudflare_api_token" {
+  sensitive = true
+}
+
+variable "cloudflare_zone_id" {
+  type = string
+}
+
 provider "hcloud" {
   token = var.hcloud_token
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 resource "hcloud_ssh_key" "default" {
@@ -148,4 +164,37 @@ resource "hcloud_server" "worker2" {
 
 output "master_ip" {
   value = hcloud_server.master.ipv4_address
+}
+
+resource "hcloud_server" "worker3" {
+  name         = "k3s-worker-3"
+  image        = "ubuntu-22.04"
+  server_type  = "cx23"
+  location     = "nbg1"
+  ssh_keys     = [hcloud_ssh_key.default.id]
+  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+
+  network {
+    network_id = hcloud_network.k3s_net.id
+    ip         = "10.0.1.8"
+  }
+
+  user_data = templatefile("${path.module}/cloud-init.yaml", {
+    role      = "agent"
+    token     = "secretk3stoken"
+    master_ip = "10.0.1.5"
+  })
+
+  depends_on = [
+    hcloud_network_subnet.k3s_subnet,
+    hcloud_server.master
+  ]
+}
+
+resource "cloudflare_record" "k8s_lbs" {
+  zone_id = var.cloudflare_zone_id
+  name    = "k8s"
+  value   = hcloud_server.master.ipv4_address
+  type    = "A"
+  proxied = true
 }
