@@ -4,6 +4,9 @@ on:
     repository_dispatch:
         types: [update_color]
 
+permissions:
+    contents: write
+
 jobs:
     update-color:
         runs-on: ubuntu-latest

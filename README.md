@@ -117,8 +117,26 @@ $(terraform output -raw argocd_password_command)
 
 ---
 
-## 🤖 Telegram Cluster Manager
+## 🐙 How to Access ArgoCD
 
+1.  **Get the Password**:
+    ```bash
+    kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo
+    ```
+
+2.  **Connect via Port-Forward**:
+    ```bash
+    kubectl port-forward svc/argocd-server -n argocd 8080:443
+    ```
+
+3.  **Login**:
+    -   **URL**: [https://localhost:8080](https://localhost:8080)
+    -   **Username**: `admin`
+    -   **Password**: *(Output from step 1)*
+
+---
+
+## 🤖 Telegram Bot Commands
 Manage your infrastructure directly from Telegram with real-time status updates.
 
 ### Features
