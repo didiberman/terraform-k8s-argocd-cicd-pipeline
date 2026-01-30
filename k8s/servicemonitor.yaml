@@ -3,6 +3,8 @@ kind: ServiceMonitor
 metadata:
   name: sample-app
   namespace: monitoring # Must be in the same namespace as Prometheus operator usually, or correctly labeled
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     release: kube-prometheus-stack # Critical label for Prometheus to auto-discover this
 spec:
