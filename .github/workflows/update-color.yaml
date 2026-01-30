@@ -37,6 +37,12 @@ jobs:
                   git config user.name "GitHub Action"
                   git config user.email "action@github.com"
                   git add k8s/daemonset.yaml
-                  git commit -m "feat(ui): update background color to ${{ github.event.client_payload.color }}"
-                  git pull --rebase
-                  git push
+
+                  # Only commit if there are changes
+                  if [[ -n $(git status --porcelain) ]]; then
+                    git commit -m "feat(ui): update background color to ${{ github.event.client_payload.color }}"
+                    git pull --rebase
+                    git push
+                  else
+                    echo "No changes to commit. Color is already set."
+                  fi
