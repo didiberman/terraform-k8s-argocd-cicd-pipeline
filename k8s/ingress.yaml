@@ -5,10 +5,12 @@ metadata:
   namespace: default
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
     - hosts:
         - k8s.didiberman.com
+      secretName: tls-secret
   rules:
     - host: k8s.didiberman.com
       http:
