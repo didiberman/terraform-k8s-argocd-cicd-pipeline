@@ -37,3 +37,4 @@ override.tf.json
 terraform.rc
 /.agent
 /src/node_modules
+infra/.terraform.lock.hcl

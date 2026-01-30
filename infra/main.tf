@@ -198,3 +198,55 @@ resource "cloudflare_record" "k8s_lbs" {
   type    = "A"
   proxied = false
 }
+
+resource "null_resource" "k8s_bootstrap" {
+  depends_on = [hcloud_server.master]
+
+  connection {
+    type        = "ssh"
+    user        = "root"
+    private_key = file("~/.ssh/id_rsa")
+    host        = hcloud_server.master.ipv4_address
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'Waiting for K3s to be ready...'",
+      "until kubectl get nodes; do sleep 5; done",
+
+      "echo 'Installing ArgoCD...'",
+      "kubectl create namespace argocd || true",
+      "kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml",
+      "kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s",
+
+      "echo 'Installing Cert-Manager...'",
+      "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml",
+      "kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s",
+    ]
+  }
+
+  # We apply the app manifest in a separate step or via file provisioner to get the file there first
+  # But since the file is in git, we can just curl it or create it inline.
+  # For simplicity, let's create it inline since it's small, or use a here-doc.
+  provisioner "file" {
+    source      = "../k8s/argocd-app.yaml"
+    destination = "/root/argocd-app.yaml"
+  }
+
+  provisioner "file" {
+    source      = "../k8s/cluster-issuer.yaml"
+    destination = "/root/cluster-issuer.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'Applying Initial Configurations...'",
+      "kubectl apply -f /root/cluster-issuer.yaml",
+      "kubectl apply -f /root/argocd-app.yaml"
+    ]
+  }
+}
+
+output "kubeconfig_command" {
+  value = "scp -i ~/.ssh/id_rsa root@${hcloud_server.master.ipv4_address}:/etc/rancher/k3s/k3s.yaml ~/.kube/k3s-hetzner.yaml && sed -i '' 's/127.0.0.1/${hcloud_server.master.ipv4_address}/g' ~/.kube/k3s-hetzner.yaml"
+}
