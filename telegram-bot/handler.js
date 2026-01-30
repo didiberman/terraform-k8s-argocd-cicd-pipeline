@@ -91,6 +91,7 @@ exports.handler = async (event) => {
             keyboards.backMenu
           );
         } catch (err) {
+          console.error("Get Pods Error:", err);
           const msg =
             err.message === "K8s API request timed out"
               ? "Cluster is not reachable (timeout)."
@@ -120,6 +121,7 @@ exports.handler = async (event) => {
             keyboards.backMenu
           );
         } catch (err) {
+          console.error("Get Nodes Error:", err);
           const msg =
             err.message === "K8s API request timed out"
               ? "Cluster is not reachable (timeout)."
@@ -137,7 +139,7 @@ exports.handler = async (event) => {
 
     return { statusCode: 200, body: "ok" };
   } catch (err) {
-    console.error("Handler error:", err);
+    console.error("Critical Handler Error:", err);
     return { statusCode: 200, body: "ok" };
   }
 };

@@ -162,7 +162,7 @@ jobs:
         if: failure() && github.event.client_payload.chat_id && env.TG_MSG_ID != ''
         run: |
           ACTION="${{ github.event.action }}"
-          MSG="❌ *Failed* during step: $ACTION. Check GitHub logs for details."
+          MSG="❌ *Failed* during step: \`$ACTION\`. Check GitHub logs for details."
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
             -d chat_id="${{ github.event.client_payload.chat_id }}" \
             -d message_id="${{ env.TG_MSG_ID }}" \

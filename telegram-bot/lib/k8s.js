@@ -26,6 +26,9 @@ function k8sRequest(kubeconfig, path) {
       rejectUnauthorized: true,
     };
 
+    console.log(`Sending K8s request to: ${kubeconfig.server}${path}`);
+    console.log("Options:", { ...options, ca: "...", cert: "...", key: "..." });
+
     const req = https.request(options, (res) => {
       let data = "";
       res.on("data", (c) => (data += c));
