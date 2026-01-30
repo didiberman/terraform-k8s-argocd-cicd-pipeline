@@ -60,9 +60,36 @@ jobs:
             echo "Failed to capture TG_MSG_ID"
           fi
 
+      - name: Start Live Stream
+        if: github.event.client_payload.chat_id && env.TG_MSG_ID != ''
+        run: |
+          touch terraform.log
+          (
+            while [ -f terraform.log ]; do
+              TAIL=$(tail -n 12 terraform.log)
+              if [ -n "$TAIL" ]; then
+                ACTION="${{ github.event.action }}"
+                MSG="🚀 *Status: $ACTION*\n\n\`\`\`\n$TAIL\n\`\`\`"
+                
+                # Build JSON safely with jq
+                jq -n \
+                  --arg chat_id "${{ github.event.client_payload.chat_id }}" \
+                  --arg message_id "${{ env.TG_MSG_ID }}" \
+                  --arg text "$MSG" \
+                  '{"chat_id": $chat_id, "message_id": $message_id, "text": $text, "parse_mode": "Markdown"}' > payload.json
+
+                curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/editMessageText" \
+                  -H "Content-Type: application/json" \
+                  -d @payload.json > /dev/null
+              fi
+              sleep 7
+            done
+          ) &
+          echo "STREAMER_PID=$!" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         working-directory: infra
-        run: terraform init
+        run: terraform init | tee -a ../terraform.log
 
       - name: Notify Telegram - Initialized
         if: github.event.client_payload.chat_id && env.TG_MSG_ID != ''
@@ -76,12 +103,20 @@ jobs:
       - name: Terraform Apply
         if: github.event.action == 'terraform_apply'
         working-directory: infra
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve | tee -a ../terraform.log
 
       - name: Terraform Destroy
         if: github.event.action == 'terraform_destroy'
         working-directory: infra
-        run: terraform destroy -auto-approve
+        run: terraform destroy -auto-approve | tee -a ../terraform.log
+
+      - name: Stop Live Stream
+        if: always()
+        run: |
+          if [ -n "$STREAMER_PID" ]; then
+            kill "$STREAMER_PID" || true
+          fi
+          rm -f terraform.log
 
       - name: Notify Telegram - Infrastructure Done
         if: github.event.client_payload.chat_id && env.TG_MSG_ID != ''
