@@ -70,6 +70,7 @@ jobs:
           if [[ -n $(git status --porcelain) ]]; then
             git add k8s/daemonset.yaml
             git commit -m "CD: Update image tag to $NEW_TAG"
+            git pull --rebase
             git push
           else
             echo "No changes to manifest."
