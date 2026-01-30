@@ -86,6 +86,24 @@ resource "hcloud_firewall" "k3s_firewall" {
       "::/0"
     ]
   }
+
+  # Allow all internal traffic for CNI (Flannel VXLAN/WireGuard) and Pod-to-Pod communication
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "any"
+    source_ips = [
+      "10.0.0.0/8" # Broad internal range or specific subnet 10.0.1.0/24
+    ]
+  }
+  rule {
+    direction = "in"
+    protocol  = "udp"
+    port      = "any"
+    source_ips = [
+      "10.0.0.0/8"
+    ]
+  }
 }
 
 resource "hcloud_server" "master" {
@@ -196,7 +214,7 @@ resource "cloudflare_record" "k8s_lbs" {
   name    = "k8s"
   content = hcloud_server.master.ipv4_address
   type    = "A"
-  proxied = false
+  proxied = true
 }
 
 resource "null_resource" "k8s_bootstrap" {
