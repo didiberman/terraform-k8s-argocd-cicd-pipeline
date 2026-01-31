@@ -8,6 +8,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+    talos = {
+      source  = "siderolabs/talos"
+      version = "~> 0.7"
+    }
   }
 
   backend "s3" {
@@ -31,11 +35,6 @@ variable "cloudflare_zone_id" {
   type = string
 }
 
-variable "ssh_public_key" {
-  type    = string
-  default = ""
-}
-
 provider "hcloud" {
   token = var.hcloud_token
 }
@@ -44,38 +43,22 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-locals {
-  ssh_public_key = var.ssh_public_key != "" ? var.ssh_public_key : file("~/.ssh/id_rsa.pub")
-}
+provider "talos" {}
 
-resource "hcloud_ssh_key" "default" {
-  name       = "k3s-ssh-key"
-  public_key = local.ssh_public_key
-}
-
-resource "hcloud_network" "k3s_net" {
-  name     = "k3s-network"
+resource "hcloud_network" "k8s_net" {
+  name     = "k8s-network"
   ip_range = "10.0.0.0/16"
 }
 
-resource "hcloud_network_subnet" "k3s_subnet" {
-  network_id   = hcloud_network.k3s_net.id
+resource "hcloud_network_subnet" "k8s_subnet" {
+  network_id   = hcloud_network.k8s_net.id
   type         = "cloud"
   network_zone = "eu-central"
   ip_range     = "10.0.1.0/24"
 }
 
-resource "hcloud_firewall" "k3s_firewall" {
-  name = "k3s-firewall"
-  rule {
-    direction = "in"
-    protocol  = "tcp"
-    port      = "22"
-    source_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
+resource "hcloud_firewall" "k8s_firewall" {
+  name = "k8s-firewall"
   rule {
     direction = "in"
     protocol  = "tcp"
@@ -88,7 +71,7 @@ resource "hcloud_firewall" "k3s_firewall" {
   rule {
     direction = "in"
     protocol  = "tcp"
-    port      = "80"
+    port      = "50000" # Talos API
     source_ips = [
       "0.0.0.0/0",
       "::/0"
@@ -103,8 +86,17 @@ resource "hcloud_firewall" "k3s_firewall" {
       "::/0"
     ]
   }
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "80"
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
 
-  # Allow all internal traffic for CNI (Flannel VXLAN/WireGuard) and Pod-to-Pod communication
+  # Allow all internal traffic
   rule {
     direction = "in"
     protocol  = "tcp"
@@ -125,144 +117,157 @@ resource "hcloud_firewall" "k3s_firewall" {
   }
 }
 
+# Talos Configuration
+resource "talos_machine_secrets" "this" {
+  talos_version = "v1.11"
+}
+
+data "talos_machine_configuration" "controlplane" {
+  cluster_name       = "talos-k8s"
+  machine_type       = "controlplane"
+  cluster_endpoint   = "https://${hcloud_server.master.ipv4_address}:6443"
+  machine_secrets    = talos_machine_secrets.this.machine_secrets
+  talos_version      = "v1.11"
+  kubernetes_version = "v1.30.0"
+}
+
+data "talos_machine_configuration" "worker" {
+  cluster_name       = "talos-k8s"
+  machine_type       = "worker"
+  cluster_endpoint   = "https://${hcloud_server.master.ipv4_address}:6443"
+  machine_secrets    = talos_machine_secrets.this.machine_secrets
+  talos_version      = "v1.11"
+  kubernetes_version = "v1.30.0"
+}
+
+data "talos_client_configuration" "this" {
+  cluster_name         = "talos-k8s"
+  client_configuration = talos_machine_secrets.this.client_configuration
+  nodes                = [hcloud_server.master.ipv4_address]
+}
+
+# Master Node
 resource "hcloud_server" "master" {
-  name         = "k3s-master"
-  image        = "ubuntu-22.04"
-  server_type  = "cpx22" # Smallest available
+  name         = "talos-master"
+  image        = "ubuntu-24.04"
+  server_type  = "cpx22"
   location     = "nbg1"
-  ssh_keys     = [hcloud_ssh_key.default.id]
-  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+  iso          = "hcloud-v1-11-2-amd64.iso"
+  firewall_ids = [hcloud_firewall.k8s_firewall.id]
 
   network {
-    network_id = hcloud_network.k3s_net.id
+    network_id = hcloud_network.k8s_net.id
     ip         = "10.0.1.5"
   }
 
-  user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role             = "server"
-    token            = "secretk3stoken" # In prod, use random string
-    master_ip        = ""               # Not used for server role
-    master_public_ip = ""               # Not used for server role
-    location         = "nbg1"
-  })
-
-  depends_on = [
-    hcloud_network_subnet.k3s_subnet
-  ]
+  depends_on = [hcloud_network_subnet.k8s_subnet]
 }
 
-resource "hcloud_server" "worker" {
-  name         = "k3s-worker-1"
-  image        = "ubuntu-22.04"
+resource "talos_machine_configuration_apply" "controlplane" {
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.controlplane.machine_configuration
+  node                        = hcloud_server.master.ipv4_address
+}
+
+resource "talos_machine_bootstrap" "this" {
+  depends_on = [talos_machine_configuration_apply.controlplane]
+
+  client_configuration = talos_machine_secrets.this.client_configuration
+  node                 = hcloud_server.master.ipv4_address
+}
+
+resource "talos_cluster_kubeconfig" "this" {
+  depends_on           = [talos_machine_bootstrap.this]
+  client_configuration = talos_machine_secrets.this.client_configuration
+  node                 = hcloud_server.master.ipv4_address
+}
+
+# Worker Nodes
+resource "hcloud_server" "worker1" {
+  name         = "talos-worker-1"
+  image        = "ubuntu-24.04"
   server_type  = "cpx22"
   location     = "fsn1"
-  ssh_keys     = [hcloud_ssh_key.default.id]
-  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+  iso          = "hcloud-v1-11-2-amd64.iso"
+  firewall_ids = [hcloud_firewall.k8s_firewall.id]
 
   network {
-    network_id = hcloud_network.k3s_net.id
+    network_id = hcloud_network.k8s_net.id
     ip         = "10.0.1.6"
   }
+  depends_on = [hcloud_network_subnet.k8s_subnet]
+}
 
-  user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role             = "agent"
-    token            = "secretk3stoken"
-    master_ip        = "10.0.1.5"
-    master_public_ip = hcloud_server.master.ipv4_address
-    location         = "fsn1"
-  })
-
-  depends_on = [
-    hcloud_network_subnet.k3s_subnet,
-    hcloud_server.master
-  ]
+resource "talos_machine_configuration_apply" "worker1" {
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
+  node                        = hcloud_server.worker1.ipv4_address
 }
 
 resource "hcloud_server" "worker2" {
-  name         = "k3s-worker-2"
-  image        = "ubuntu-22.04"
+  name         = "talos-worker-2"
+  image        = "ubuntu-24.04"
   server_type  = "cpx22"
   location     = "hel1"
-  ssh_keys     = [hcloud_ssh_key.default.id]
-  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+  iso          = "hcloud-v1-11-2-amd64.iso"
+  firewall_ids = [hcloud_firewall.k8s_firewall.id]
 
   network {
-    network_id = hcloud_network.k3s_net.id
+    network_id = hcloud_network.k8s_net.id
     ip         = "10.0.1.7"
   }
-
-  user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role             = "agent"
-    token            = "secretk3stoken"
-    master_ip        = "10.0.1.5"
-    master_public_ip = hcloud_server.master.ipv4_address
-    location         = "hel1"
-  })
-
-  depends_on = [
-    hcloud_network_subnet.k3s_subnet,
-    hcloud_server.master
-  ]
+  depends_on = [hcloud_network_subnet.k8s_subnet]
 }
 
-output "master_ip" {
-  value = hcloud_server.master.ipv4_address
+resource "talos_machine_configuration_apply" "worker2" {
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
+  node                        = hcloud_server.worker2.ipv4_address
 }
 
 resource "hcloud_server" "worker3" {
-  name         = "k3s-worker-3"
-  image        = "ubuntu-22.04"
+  name         = "talos-worker-3"
+  image        = "ubuntu-24.04"
   server_type  = "cpx22"
   location     = "sin"
-  ssh_keys     = [hcloud_ssh_key.default.id]
-  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+  iso          = "hcloud-v1-11-2-amd64.iso"
+  firewall_ids = [hcloud_firewall.k8s_firewall.id]
 
   network {
-    network_id = hcloud_network.k3s_net.id
+    network_id = hcloud_network.k8s_net.id
     ip         = "10.0.1.8"
   }
+  depends_on = [hcloud_network_subnet.k8s_subnet]
+}
 
-  user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role             = "agent"
-    token            = "secretk3stoken"
-    master_ip        = "10.0.1.5"
-    master_public_ip = hcloud_server.master.ipv4_address
-    location         = "sin"
-  })
-
-  depends_on = [
-    hcloud_network_subnet.k3s_subnet,
-    hcloud_server.master
-  ]
+resource "talos_machine_configuration_apply" "worker3" {
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
+  node                        = hcloud_server.worker3.ipv4_address
 }
 
 resource "hcloud_server" "worker4" {
-  name         = "k3s-worker-4"
-  image        = "ubuntu-22.04"
+  name         = "talos-worker-4"
+  image        = "ubuntu-24.04"
   server_type  = "cpx11"
   location     = "ash"
-  ssh_keys     = [hcloud_ssh_key.default.id]
-  firewall_ids = [hcloud_firewall.k3s_firewall.id]
+  iso          = "hcloud-v1-11-2-amd64.iso"
+  firewall_ids = [hcloud_firewall.k8s_firewall.id]
 
   network {
-    network_id = hcloud_network.k3s_net.id
+    network_id = hcloud_network.k8s_net.id
     ip         = "10.0.1.9"
   }
-
-  user_data = templatefile("${path.module}/cloud-init.yaml", {
-    role             = "agent"
-    token            = "secretk3stoken"
-    master_ip        = "10.0.1.5"
-    master_public_ip = hcloud_server.master.ipv4_address
-    location         = "ash"
-  })
-
-  depends_on = [
-    hcloud_network_subnet.k3s_subnet,
-    hcloud_server.master
-  ]
+  depends_on = [hcloud_network_subnet.k8s_subnet]
 }
 
+resource "talos_machine_configuration_apply" "worker4" {
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
+  node                        = hcloud_server.worker4.ipv4_address
+}
+
+# Cloudflare DNS
 resource "cloudflare_record" "k8s_lbs" {
   zone_id = var.cloudflare_zone_id
   name    = "k8s"
@@ -271,61 +276,63 @@ resource "cloudflare_record" "k8s_lbs" {
   proxied = true
 }
 
+# Bootstrapping (ArgoCD & CNI)
 resource "null_resource" "k8s_bootstrap" {
-  depends_on = [hcloud_server.master]
+  depends_on = [
+    talos_cluster_kubeconfig.this,
+    talos_machine_bootstrap.this,
+    talos_machine_configuration_apply.worker1,
+    talos_machine_configuration_apply.worker2,
+    talos_machine_configuration_apply.worker3,
+    talos_machine_configuration_apply.worker4
+  ]
 
-  connection {
-    type        = "ssh"
-    user        = "root"
-    private_key = file("~/.ssh/id_rsa")
-    host        = hcloud_server.master.ipv4_address
-    timeout     = "10m"
-  }
+  provisioner "local-exec" {
+    command = <<EOT
+      echo "${resource.talos_cluster_kubeconfig.this.kubeconfig_raw}" > kubeconfig.yaml
+      export KUBECONFIG=./kubeconfig.yaml
 
-  provisioner "remote-exec" {
-    inline = [
-      "echo '🚀 Master node reached. Waiting 30s for cloud-init to stabilize...'",
-      "sleep 30",
+      echo "⏳ Waiting for API Server..."
+      until kubectl get nodes; do echo "Waiting for API..."; sleep 5; done
 
-      "echo '⏳ Waiting for kubectl binary to be available...'",
-      "until [ -f /usr/local/bin/kubectl ]; do echo '...still waiting for k3s install...'; sleep 10; done",
+      echo "📦 Installing Flannel CNI..."
+      kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
 
-      "echo '⏳ Waiting for K3s nodes to be Ready...'",
-      "until kubectl get nodes | grep -q 'Ready'; do echo '...waiting for nodes to report ready...'; sleep 10; done",
+      echo "⏳ Waiting for Nodes to be Ready..."
+      kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
-      "echo '📦 Installing ArgoCD...'",
-      "kubectl create namespace argocd || true",
-      "kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml",
-      "echo '⏳ Waiting for ArgoCD Server...'",
-      "kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s",
+      echo "📦 Installing ArgoCD..."
+      kubectl create namespace argocd || true
+      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      
+      echo "⏳ Waiting for ArgoCD Server..."
+      kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s
 
-      "echo '🛡️ Installing Cert-Manager...'",
-      "kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml",
-      "echo '⏳ Waiting for Cert-Manager...'",
-      "kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s",
-    ]
-  }
+      echo "🛡️ Installing Cert-Manager..."
+      kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+      
+      echo "⏳ Waiting for Cert-Manager..."
+      kubectl wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
 
-  # We apply the app manifest in a separate step or via file provisioner to get the file there first
-  # But since the file is in git, we can just curl it or create it inline.
-  # For simplicity, let's create it inline since it's small, or use a here-doc.
-  provisioner "file" {
-    source      = "../k8s/argocd-app.yaml"
-    destination = "/root/argocd-app.yaml"
-  }
+      echo "🚦 Installing Traefik Ingress..."
+      kubectl apply -f ../k8s/traefik.yaml
 
-  provisioner "remote-exec" {
-    inline = [
-      "echo 'Applying Initial Configurations...'",
-      "kubectl apply -f /root/argocd-app.yaml"
-    ]
+      echo "🚀 Applying App of Apps..."
+      kubectl apply -f ../k8s/argocd-app.yaml
+    EOT
   }
 }
 
-output "kubeconfig_command" {
-  value = "scp -i ~/.ssh/id_rsa root@${hcloud_server.master.ipv4_address}:/etc/rancher/k3s/k3s.yaml ~/.kube/k3s-hetzner.yaml && sed -i '' 's/127.0.0.1/${hcloud_server.master.ipv4_address}/g' ~/.kube/k3s-hetzner.yaml"
+output "talosconfig" {
+  value     = data.talos_client_configuration.this.talos_config
+  sensitive = true
 }
 
-output "argocd_password_command" {
-  value = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && echo"
+output "kubeconfig" {
+  value     = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
+  sensitive = true
+}
+
+output "master_ip" {
+  value = hcloud_server.master.ipv4_address
 }

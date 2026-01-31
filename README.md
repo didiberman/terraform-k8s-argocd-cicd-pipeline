@@ -1,6 +1,6 @@
 # 🍍 Terraform K8s ArgoCD Pipeline (Hetzner + Cloudflare)
 
-A fully automated, zero-touch infrastructure pipeline that provisions a **K3s Kubernetes Cluster** on Hetzner Cloud, sets up **ArgoCD** for GitOps, and exposes services securely via **Cloudflare Proxy**.
+A fully automated, zero-touch infrastructure pipeline that provisions a **Talos Linux Kubernetes Cluster** on Hetzner Cloud, sets up **ArgoCD** for GitOps, and exposes services securely via **Cloudflare Proxy**.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
@@ -11,12 +11,13 @@ A fully automated, zero-touch infrastructure pipeline that provisions a **K3s Ku
 - **Infrastructure as Code**: Terraform provisions VMs, Firewalls, Private Networks, and Cloudflare DNS records.
 - **Remote State**: Securely stored in **AWS S3** with state locking via **DynamoDB**.
 - **Telegram Cluster Manager**: Control your entire cluster via Telegram (Deploy, Destroy, Get Logs, Get Nodes with IPs).
-- **Automated Bootstrap**: Cloud-Init & Remote-Exec automatically install K3s, ArgoCD, and required CRDs. No manual `kubectl` required.
+- **Talos Linux**: Immutable, secure, and minimal OS designed specifically for Kubernetes. Blazing fast boot times, no SSH, no package managers, just API.
+- **Automated Bootstrap**: Terraform configures Talos, CNI (Flannel), and ArgoCD. No manual `kubectl` required.
 - **GitOps First**: ArgoCD watches this repo (`k8s/`) to manage the application loop.
 - **Secure Networking**:
     - **Cloudflare Proxy**: Hides origin server IP. SSL Termination at the edge (Flexible/Full).
-    - **Hetzner Firewall**: Strict rules allowing only Cloudflare, Internal CNI, and SSH.
-    - **Private Network**: K3s nodes communicate over a private `10.0.1.0/24` network.
+    - **Hetzner Firewall**: Strict rules allowing only Cloudflare, Internal CNI, and Talos API.
+    - **Private Network**: Nodes communicate over a private `10.0.1.0/24` network.
 - **Observability**: Prometheus & Grafana stack included (managed via ArgoCD).
 - **Fun Demo App**: A Node.js app featuring real-time metrics, visuals, and... falling pineapples 🍍.
 
@@ -30,7 +31,7 @@ flowchart LR
         ingress -->|Route| svc[NodeJS App]
         
         subgraph Control Plane
-            k3s[K3s Master]
+            k3s[Talos Master]
             argo[ArgoCD]
         end
         
@@ -48,7 +49,7 @@ flowchart LR
 ## 🛠 Tech Stack
 
 - **Cloud**: Hetzner Cloud (Compute), Cloudflare (DNS/CDN)
-- **Cluster**: [K3s](https://k3s.io) (Lightweight Kubernetes)
+- **Cluster**: [Talos Linux](https://www.talos.dev/) (Immutable Kubernetes OS)
 - **IaC**: [Terraform](https://www.terraform.io/)
 - **GitOps**: [ArgoCD](https://argo-cd.readthedocs.io/)
 - **CI**: GitHub Actions (Build -> Test -> Push to GHCR)
@@ -88,8 +89,8 @@ terraform apply
 
 > **What happens here?**
 > 1. Terraform creates Servers, Firewalls, and Networks.
-> 2. Cloud-Init installs K3s on the master and joins workers.
-> 3. Terraform uses `remote-exec` to wait for the cluster, then installs ArgoCD & Cert-Manager manifests directly.
+> 2. Talos configures the Control Plane and Workers (API-driven).
+> 3. Terraform installs Flannel CNI, ArgoCD, and Cert-Manager manifests directly.
 > 4. ArgoCD takes over and deploys the application.
 
 ### 4. Access the Cluster
