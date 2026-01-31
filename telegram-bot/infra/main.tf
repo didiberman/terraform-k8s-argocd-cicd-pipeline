@@ -176,17 +176,52 @@ resource "null_resource" "register_webhook" {
 
 # --- GitHub Actions IAM User (Persistent) ---
 
-resource "aws_iam_user" "github_actions" {
-  name = "github-actions-k8s-manager"
+# --- GitHub Actions OIDC Configuration ---
+
+# 1. Create the OIDC Provider for GitHub (if not already existing in account)
+# Note: If this terraform module is destroyed, it will remove the provider. 
+# If you share this account, ensure this doesn't conflict.
+data "tls_certificate" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
-resource "aws_iam_access_key" "github_actions" {
-  user = aws_iam_user.github_actions.name
+resource "aws_iam_openid_connect_provider" "github" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
-resource "aws_iam_user_policy" "github_actions" {
-  name = "k8s-infrastructure-management"
-  user = aws_iam_user.github_actions.name
+# 2. Create the IAM Role that GitHub Actions will assume
+resource "aws_iam_role" "github_actions" {
+  name = "github-actions-oidc-k8s-manager"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github.arn
+        }
+        Condition = {
+          StringLike = {
+            # Allow any branch/tag in this specific repo to assume the role
+            "token.actions.githubusercontent.com:sub" : "repo:${var.github_repo}:*"
+          }
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" : "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# 3. Attach Permissions to the Role
+resource "aws_iam_role_policy" "github_actions" {
+  name = "k8s-infrastructure-management-oidc"
+  role = aws_iam_role.github_actions.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -223,18 +258,24 @@ resource "aws_iam_user_policy" "github_actions" {
         ],
         "Resource" : "arn:aws:ssm:eu-central-1:*:parameter/k8s/*"
       },
+      # Allow managing the bot infrastructure too (Lambda, API Gateway, IAM Roles for Lambda)
       {
         "Effect" : "Allow",
         "Action" : [
-          "iam:GetUser",
-          "iam:ListAccessKeys",
-          "iam:GetUserPolicy",
-          "iam:ListUserPolicies",
-          "iam:PutUserPolicy",
-          "iam:DeleteUserPolicy",
-          "iam:DeleteAccessKey"
+          "lambda:*",
+          "apigateway:*",
+          "iam:PassRole",
+          "iam:GetRole",
+          "iam:CreateRole",
+          "iam:PutRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:GetRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:DeleteRole",
+          # Allow updating this specific role or OIDC provider if needed (careful)
+          "iam:GetOpenIDConnectProvider"
         ],
-        "Resource" : "arn:aws:iam::*:user/github-actions-k8s-manager"
+        "Resource" : "*"
       }
     ]
   })
@@ -242,13 +283,9 @@ resource "aws_iam_user_policy" "github_actions" {
 
 # --- Outputs ---
 
-output "github_actions_access_key_id" {
-  value = aws_iam_access_key.github_actions.id
-}
-
-output "github_actions_secret_access_key" {
-  value     = aws_iam_access_key.github_actions.secret
-  sensitive = true
+output "github_actions_role_arn" {
+  description = "The ARN of the IAM Role to configure in GitHub Actions secrets"
+  value       = aws_iam_role.github_actions.arn
 }
 
 output "webhook_url" {
