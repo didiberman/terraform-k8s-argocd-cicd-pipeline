@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: sample-app
-          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:sha-dc2895b00b2030f5dd8d6d64ca78db3df82bea16
+          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:sha-7da44039eff560cba2015fa4f95f1a18b3a61efd
           env:
             - name: NODE_NAME
               valueFrom:
