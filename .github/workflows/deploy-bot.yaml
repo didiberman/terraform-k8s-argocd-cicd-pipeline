@@ -1,39 +1,39 @@
 name: Deploy Telegram Bot
 
 on:
-    push:
-        paths:
-            - "telegram-bot/**"
-        branches:
-            - main
+  push:
+    paths:
+      - "telegram-bot/**"
+    branches:
+      - main
 
-env:
-    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    AWS_DEFAULT_REGION: eu-central-1
-    TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    TF_VAR_github_token: ${{ secrets.GH_PAT }} # Using PAT if available, or GITHUB_TOKEN if not.
-    TF_VAR_github_repo: ${{ github.repository }}
-    TF_VAR_allowed_username: "didi_89" # Hardcoded or secret? Let's check tfvars.
+  permissions:
+    id-token: write
+    contents: read
 
-jobs:
-    deploy-bot:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+  deploy-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Setup Terraform
-              uses: hashicorp/setup-terraform@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
 
-            - name: Terraform Init
-              working-directory: telegram-bot/infra
-              run: terraform init
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-            - name: Terraform Apply
-              working-directory: telegram-bot/infra
-              run: terraform apply -auto-approve
-              env:
-                  # Fallback if GH_PAT secret is missing, try standard token (might fail for some scopes but okay for dispatch)
-                  TF_VAR_github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-                  TF_VAR_allowed_username: ${{ secrets.ALLOWED_USERNAME || 'didi_89' }}
+      - name: Terraform Init
+        working-directory: telegram-bot/infra
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: telegram-bot/infra
+        run: terraform apply -auto-approve
+        env:
+          # Fallback if GH_PAT secret is missing, try standard token (might fail for some scopes but okay for dispatch)
+          TF_VAR_github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          TF_VAR_allowed_username: ${{ secrets.ALLOWED_USERNAME || 'didi_89' }}
