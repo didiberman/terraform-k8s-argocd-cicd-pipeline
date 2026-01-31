@@ -7,12 +7,18 @@ on:
     branches:
       - main
 
-  permissions:
-    id-token: write
-    contents: read
+env:
+  TF_VAR_telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TF_VAR_github_token: ${{ secrets.GH_PAT }}
+  TF_VAR_github_repo: ${{ github.repository }}
+  TF_VAR_allowed_username: "didi_89"
 
+jobs:
   deploy-bot:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,6 +40,5 @@ on:
         working-directory: telegram-bot/infra
         run: terraform apply -auto-approve
         env:
-          # Fallback if GH_PAT secret is missing, try standard token (might fail for some scopes but okay for dispatch)
           TF_VAR_github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           TF_VAR_allowed_username: ${{ secrets.ALLOWED_USERNAME || 'didi_89' }}
