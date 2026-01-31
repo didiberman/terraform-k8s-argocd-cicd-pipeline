@@ -16,14 +16,14 @@ spec:
     spec:
       containers:
         - name: sample-app
-          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:sha-2afb9e761b7fb6c18ecb773d37f72ab6c22fa4ff
+          image: ghcr.io/didiberman/terraform-k8s-argocd-cicd-pipeline:sha-8b1112a9ae8d3e31454eb9d42eb7294f92147a2b
           env:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: BG_COLOR
-              value: "#22c55e" # BG_COLOR - Managed by Update App Color Action
+              value: "#ef4444" # BG_COLOR - Managed by Update App Color Action
             - name: NODE_LOCATION_FILE
               value: "/app/config/location"
           ports:
